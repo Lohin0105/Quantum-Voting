@@ -843,7 +843,7 @@ if st.session_state.page == "user":
 if st.session_state.page == "user_register":
     st.markdown('<div class="section-title">🆕 Voter Registration</div>', unsafe_allow_html=True)
     st.markdown('<div class="section-sub">Submit your details to enroll.</div>', unsafe_allow_html=True)
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("---")
     st.markdown('<h4>Voter Detail Submission</h4>', unsafe_allow_html=True)
     vid   = st.text_input("Voter ID", placeholder="Enter your assigned Voter ID", key="reg_vid")
     uname = st.text_input("Full Name", placeholder="Your name (used as login username)", key="reg_name")
@@ -879,17 +879,16 @@ if st.session_state.page == "user_register":
                     st.info("⚠️ I think you are a new voter, your details are not currently in the database. Our admin will verify your Voter ID when he accepts it. We will send an email regarding your verification, then you can log in.")
                 else:
                     st.success("✅ **Details sent to Admin!** Your registration is in progress. The administrator will verify your info and send you an email. You can login only after verification.")
-    st.markdown('</div>', unsafe_allow_html=True)
+
     if st.button("← Back to Menu", key="back_from_reg"):
         goto("user")
 
 if st.session_state.page == "user_login":
     st.markdown('<div class="section-title">🔐 Voter Login</div>', unsafe_allow_html=True)
     st.markdown('<div class="section-sub">Sign in using your Voter ID and Email.</div>', unsafe_allow_html=True)
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("---")
     l_vid = st.text_input("Voter ID", placeholder="Your official Voter ID", key="l_vid", disabled=st.session_state.get('login_otp_verified', False))
     l_email = st.text_input("Email", placeholder="Registered email address", key="l_email", disabled=st.session_state.get('login_otp_verified', False))
-    st.markdown('</div>', unsafe_allow_html=True)
 
     if not st.session_state.get('login_otp_verified', False):
         if not st.session_state.get('login_otp_sent', False):
@@ -921,7 +920,6 @@ if st.session_state.page == "user_login":
                             else:
                                 st.error("❌ Failed to send OTP email.")
         else:
-            st.markdown('<div class="card" style="border-color:#10b981;">', unsafe_allow_html=True)
             st.info("📧 OTP sent! Please check your email.")
             otp_val = st.text_input("Enter 6-digit OTP", key="l_otp_input")
             c1, c2 = st.columns(2)
@@ -940,11 +938,8 @@ if st.session_state.page == "user_login":
                     st.session_state.otp_time = time.time()
                     send_otp_email(l_email, st.session_state.otp)
                     st.success("New OTP sent!")
-            st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.markdown('<div class="card" style="border-color:#10b981; background: rgba(16,185,129,0.05);">', unsafe_allow_html=True)
         st.markdown('<h4 style="color:#10b981; margin:0;">✅ OTP Verified — Logging you in...</h4>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
         username = st.session_state.get("login_username")
         st.session_state.login_otp_sent = False
         st.session_state.login_otp_verified = False
@@ -1098,7 +1093,7 @@ if st.session_state.page == "admin":
 
 if st.session_state.page == "admin_register":
     st.markdown('<div class="section-title">🆕 Register Admin</div>', unsafe_allow_html=True)
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("---")
     key  = st.text_input("Admin Secret Key", type="password", placeholder="Issued by system owner", key="admin_key")
     name = st.text_input("Admin Username", key="admin_name")
     pwd  = st.text_input("Password", type="password", key="admin_pwd")
@@ -1110,13 +1105,13 @@ if st.session_state.page == "admin_register":
         else:
             save_user(name, {"password": hash_data(pwd), "role": "admin"})
             st.success("✅ Admin account created. You can now log in.")
-    st.markdown('</div>', unsafe_allow_html=True)
+
     if st.button("← Back to Menu", key="back_from_areg"):
         goto("admin")
 
 if st.session_state.page == "admin_login":
     st.markdown('<div class="section-title">🔐 Admin Login</div>', unsafe_allow_html=True)
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("---")
     a_name = st.text_input("Admin Username", key="admin_login_name")
     a_pwd  = st.text_input("Password", type="password", key="admin_login_pwd")
     if st.button("🔓 Login as Admin", key="admin_login_btn"):
@@ -1126,7 +1121,7 @@ if st.session_state.page == "admin_login":
             goto("dashboard")
         else:
             st.error("❌ Invalid credentials or not an admin account.")
-    st.markdown('</div>', unsafe_allow_html=True)
+
     if st.button("← Back to Menu", key="back_from_alogin"):
         goto("admin")
 
@@ -1469,7 +1464,7 @@ if st.session_state.page == "assistant":
                 try:
                     # Request stream from Groq
                     stream = client.chat.completions.create(
-                        model="mixtral-8x7b-32768", 
+                        model="llama-3.3-70b-versatile", 
                         messages=st.session_state.messages,
                         stream=True,
                     )
