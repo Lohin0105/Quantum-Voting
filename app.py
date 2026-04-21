@@ -143,6 +143,11 @@ html, body, [class*="css"], .stApp {
   text-align: center;
   transition: all 0.25s ease;
   cursor: pointer;
+  height: 260px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
 }
 .panel-card:hover {
   border-color: rgba(99,102,241,0.5);
@@ -780,109 +785,159 @@ if st.session_state.page == "home":
 # PAGE: USER PANEL
 # ═══════════════════════════════════════════════════════════
 if st.session_state.page == "user":
+    st.markdown('<div class="section-title">Voter Portal Menu</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-sub">Choose an action below to proceed.</div>', unsafe_allow_html=True)
+    
+    uc1, uc2 = st.columns(2, gap="medium")
+    with uc1:
+        st.markdown("""
+        <div class="panel-card">
+            <span class="icon">
+                <svg width="68" height="68" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 8px 16px rgba(16,185,129,0.4));">
+                    <defs>
+                        <linearGradient id="regGrad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#10b981"/>
+                            <stop offset="1" stop-color="#059669"/>
+                        </linearGradient>
+                    </defs>
+                    <path d="M12 4C14.2091 4 16 5.79086 16 8C16 10.2091 14.2091 12 12 12C9.79086 12 8 10.2091 8 8C8 5.79086 9.79086 4 12 4Z" fill="url(#regGrad)" fill-opacity="0.9" stroke="#6ee7b7" stroke-width="1.2"/>
+                    <path d="M4 20C4 16.6863 7.58172 14 12 14C16.4183 14 20 16.6863 20 20H4Z" fill="url(#regGrad)" fill-opacity="0.9" stroke="#6ee7b7" stroke-width="1.2"/>
+                    <path d="M19 8V12M17 10H21" stroke="#6ee7b7" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </span>
+            <h3>Register Voter</h3>
+            <p>Enroll for a new official voter identity verification.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Proceed to Register", key="menu_reg", use_container_width=True):
+            goto("user_register")
+            
+    with uc2:
+        st.markdown("""
+        <div class="panel-card">
+            <span class="icon">
+                <svg width="68" height="68" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 8px 16px rgba(245,158,11,0.4));">
+                    <defs>
+                        <linearGradient id="logGrad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#f59e0b"/>
+                            <stop offset="1" stop-color="#d97706"/>
+                        </linearGradient>
+                    </defs>
+                    <path d="M15 3H7C5.89543 3 5 3.89543 5 5V19C5 20.1046 5.89543 21 7 21H15C16.1046 21 17 20.1046 17 19V14" stroke="url(#logGrad)" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M10 12H21M21 12L18 9M21 12L18 15" stroke="url(#logGrad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </span>
+            <h3>Login to Account</h3>
+            <p>Sign in using your biometric and OTP credentials.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Proceed to Login", key="menu_login", use_container_width=True):
+            goto("user_login")
 
-    st.markdown('<div class="section-title">Voter Portal</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-sub">Register with your Voter ID or log in to cast your vote.</div>', unsafe_allow_html=True)
+if st.session_state.page == "user_register":
+    st.markdown('<div class="section-title">🆕 Voter Registration</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-sub">Submit your details to enroll.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<h4>Voter Detail Submission</h4>', unsafe_allow_html=True)
+    vid   = st.text_input("Voter ID", placeholder="Enter your assigned Voter ID", key="reg_vid")
+    uname = st.text_input("Full Name", placeholder="Your name (used as login username)", key="reg_name")
+    email = st.text_input("Email Address", placeholder="For OTP verification in login", key="reg_email")
+    pwd   = st.text_input("Password", type="password", placeholder="Create a strong password", key="reg_pwd")
 
-    tab1, tab2 = st.tabs(["🆕  Register", "🔐  Login"])
+    img = st.camera_input("📷 Capture Face to Request Verification", key="reg_cam")
 
-    # ── REGISTER ──────────────────────────────────────────
-    with tab1:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown('<h4>Voter Detail Submission</h4>', unsafe_allow_html=True)
-        vid   = st.text_input("Voter ID", placeholder="Enter your assigned Voter ID", key="reg_vid")
-        uname = st.text_input("Full Name", placeholder="Your name (used as login username)", key="reg_name")
-        email = st.text_input("Email Address", placeholder="For OTP verification in login", key="reg_email")
-        pwd   = st.text_input("Password", type="password", placeholder="Create a strong password", key="reg_pwd")
-
-        img = st.camera_input("📷 Capture Face to Request Verification", key="reg_cam")
-
-        if st.button("✅ Submit Details for Verification", key="reg_btn"):
-            voter_doc = get_valid_voter(vid)
-            if vote_id_taken(vid):
-                st.error("❌ This Voter ID is already registered/pending.")
-            elif user_exists(uname):
-                st.error("❌ Username already taken. Choose another.")
-            elif not img:
-                st.error("❌ Face capture is required.")
-            elif is_duplicate_face_db(img):
-                st.error("❌ This face is already registered with another account.")
+    if st.button("✅ Submit Details for Verification", key="reg_btn"):
+        voter_doc = get_valid_voter(vid)
+        if vote_id_taken(vid):
+            st.error("❌ This Voter ID is already registered/pending.")
+        elif user_exists(uname):
+            st.error("❌ Username already taken. Choose another.")
+        elif not img:
+            st.error("❌ Face capture is required.")
+        elif is_duplicate_face_db(img):
+            st.error("❌ This face is already registered with another account.")
+        else:
+            face_b64 = get_face_b64(img.getvalue())
+            if not face_b64:
+                st.error("❌ No face detected. Ensure good lighting and look directly at the camera.")
             else:
-                face_b64 = get_face_b64(img.getvalue())
-                if not face_b64:
-                    st.error("❌ No face detected. Ensure good lighting and look directly at the camera.")
+                save_pending_user(uname, {
+                    "vote_id": vid, 
+                    "email": email, 
+                    "password": hash_data(pwd), 
+                    "role": "user", 
+                    "face_b64": face_b64,
+                    "status": "pending"
+                })
+                if not voter_doc:
+                    st.info("⚠️ I think you are a new voter, your details are not currently in the database. Our admin will verify your Voter ID when he accepts it. We will send an email regarding your verification, then you can log in.")
                 else:
-                    save_pending_user(uname, {
-                        "vote_id": vid, 
-                        "email": email, 
-                        "password": hash_data(pwd), 
-                        "role": "user", 
-                        "face_b64": face_b64,
-                        "status": "pending"
-                    })
-                    if not voter_doc:
-                        st.info("⚠️ I think you are a new voter, your details are not currently in the database. Our admin will verify your Voter ID when he accepts it. We will send an email regarding your verification, then you can log in.")
-                    else:
-                        st.success("✅ **Details sent to Admin!** Your registration is in progress. The administrator will verify your info and send you an email. You can login only after verification.")
-        st.markdown('</div>', unsafe_allow_html=True)
+                    st.success("✅ **Details sent to Admin!** Your registration is in progress. The administrator will verify your info and send you an email. You can login only after verification.")
+    st.markdown('</div>', unsafe_allow_html=True)
+    if st.button("← Back to Menu", key="back_from_reg"):
+        goto("user")
 
-    # ── LOGIN ──────────────────────────────────────────────
-    with tab2:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        l_vid = st.text_input("Voter ID", placeholder="Your official Voter ID", key="l_vid", disabled=st.session_state.get('login_otp_verified', False))
-        l_email = st.text_input("Email", placeholder="Registered email address", key="l_email", disabled=st.session_state.get('login_otp_verified', False))
-        st.markdown('</div>', unsafe_allow_html=True)
+if st.session_state.page == "user_login":
+    st.markdown('<div class="section-title">🔐 Voter Login</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-sub">Sign in using your Voter ID and Email.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    l_vid = st.text_input("Voter ID", placeholder="Your official Voter ID", key="l_vid", disabled=st.session_state.get('login_otp_verified', False))
+    l_email = st.text_input("Email", placeholder="Registered email address", key="l_email", disabled=st.session_state.get('login_otp_verified', False))
+    st.markdown('</div>', unsafe_allow_html=True)
 
-        if not st.session_state.get('login_otp_verified', False):
-            if not st.session_state.get('login_otp_sent', False):
-                if st.button("📡 Generate OTP", key="l_gen_otp"):
-                    if not l_vid or not l_email:
-                        st.warning("Enter Voter ID and Email to continue.")
+    if not st.session_state.get('login_otp_verified', False):
+        if not st.session_state.get('login_otp_sent', False):
+            if st.button("📡 Generate OTP", key="l_gen_otp"):
+                if not l_vid or not l_email:
+                    st.warning("Enter Voter ID and Email to continue.")
+                else:
+                    users = get_all_users()
+                    user_doc = None
+                    for u in users:
+                        if u.get("vote_id") == l_vid:
+                            user_doc = u
+                            break
+                    
+                    if not user_doc:
+                        st.error("❌ Voter ID not found. Ensure you are registered.")
+                    elif user_doc.get("email") != l_email:
+                        st.error("❌ The email linked to this Voter ID is incorrect.")
+                    elif user_doc.get("status") == "pending":
+                        st.error("❌ Your account is still pending verification from the admin. Please wait for the email.")
                     else:
-                        users = get_all_users()
-                        user_doc = None
-                        for u in users:
-                            if u.get("vote_id") == l_vid:
-                                user_doc = u
-                                break
-                        
-                        if not user_doc:
-                            st.error("❌ Voter ID not found. Ensure you are registered.")
-                        elif user_doc.get("email") != l_email:
-                            st.error("❌ The email linked to this Voter ID is incorrect.")
-                        elif user_doc.get("status") == "pending":
-                            st.error("❌ Your account is still pending verification from the admin. Please wait for the email.")
-                        else:
-                            with st.spinner("Generating OTP & sending email..."):
-                                st.session_state.otp = quantum_otp()
-                                st.session_state.otp_time = time.time()
-                                st.session_state.login_username = user_doc["username"]
-                                if send_otp_email(l_email, st.session_state.otp):
-                                    st.session_state.login_otp_sent = True
-                                    st.rerun()
-                                else:
-                                    st.error("❌ Failed to send OTP email.")
-            else:
-                st.markdown('<div class="card" style="border-color:#10b981;">', unsafe_allow_html=True)
-                st.info("📧 OTP sent! Please check your email.")
-                otp_val = st.text_input("Enter 6-digit OTP", key="l_otp_input")
-                c1, c2 = st.columns(2)
-                with c1:
-                    if st.button("Verify OTP", key="l_btn_verify"):
-                        if time.time() - st.session_state.get("otp_time", 0) > 300:
-                            st.error("❌ OTP expired. Please resend.")
-                        elif otp_val == st.session_state.otp:
-                            st.session_state.login_otp_verified = True
-                            st.rerun()
-                        else:
-                            st.error("❌ OTP is wrong. Try again.")
-                with c2:
-                    if st.button("Resend OTP", key="l_btn_resend"):
-                        st.session_state.otp = quantum_otp()
-                        st.session_state.otp_time = time.time()
-                        send_otp_email(l_email, st.session_state.otp)
-                        st.success("New OTP sent!")
-                st.markdown('</div>', unsafe_allow_html=True)
+                        with st.spinner("Generating OTP & sending email..."):
+                            st.session_state.otp = quantum_otp()
+                            st.session_state.otp_time = time.time()
+                            st.session_state.login_username = user_doc["username"]
+                            if send_otp_email(l_email, st.session_state.otp):
+                                st.session_state.login_otp_sent = True
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to send OTP email.")
+        else:
+            st.markdown('<div class="card" style="border-color:#10b981;">', unsafe_allow_html=True)
+            st.info("📧 OTP sent! Please check your email.")
+            otp_val = st.text_input("Enter 6-digit OTP", key="l_otp_input")
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("Verify OTP", key="l_btn_verify"):
+                    if time.time() - st.session_state.get("otp_time", 0) > 300:
+                        st.error("❌ OTP expired. Please resend.")
+                    elif otp_val == st.session_state.otp:
+                        st.session_state.login_otp_verified = True
+                        st.rerun()
+                    else:
+                        st.error("❌ OTP is wrong. Try again.")
+            with c2:
+                if st.button("Resend OTP", key="l_btn_resend"):
+                    st.session_state.otp = quantum_otp()
+                    st.session_state.otp_time = time.time()
+                    send_otp_email(l_email, st.session_state.otp)
+                    st.success("New OTP sent!")
+            st.markdown('</div>', unsafe_allow_html=True)
+    
+    if st.button("← Back to Menu", key="back_from_login"):
+        goto("user")
         else:
             st.markdown('<div class="card" style="border-color:#10b981; background: rgba(16,185,129,0.05);">', unsafe_allow_html=True)
             st.markdown('<h4 style="color:#10b981; margin:0;">✅ OTP Verified — Logging you in...</h4>', unsafe_allow_html=True)
@@ -982,39 +1037,92 @@ if st.session_state.page == "query":
     if st.button("← Back", key="query_back"):
         goto("vote")
 
-# ═══════════════════════════════════════════════════════════
-# PAGE: ADMIN PANEL
+# PAGE: ADMIN MENU
 # ═══════════════════════════════════════════════════════════
 if st.session_state.page == "admin":
+    st.markdown('<div class="section-title">Admin Console Menu</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-sub">Authorized personnel only. Choose an action.</div>', unsafe_allow_html=True)
+    
+    ac1, ac2 = st.columns(2, gap="medium")
+    with ac1:
+        st.markdown("""
+        <div class="panel-card">
+            <span class="icon">
+                <svg width="68" height="68" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 8px 16px rgba(139,92,246,0.4));">
+                    <defs>
+                        <linearGradient id="accGrad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#8b5cf6"/>
+                            <stop offset="1" stop-color="#6366f1"/>
+                        </linearGradient>
+                    </defs>
+                    <path d="M12 12C14.2091 12 16 10.2091 16 8C16 5.79086 14.2091 4 12 4C9.79086 4 8 5.79086 8 8C8 10.2091 9.79086 12 12 12Z" fill="url(#accGrad)" fill-opacity="0.9" stroke="#c4b5fd" stroke-width="1.2"/>
+                    <path d="M18 20V19C18 16.2386 15.7614 14 13 14H11C8.23858 14 6 16.2386 6 19V20" stroke="#c4b5fd" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M15 11L17 13L21 9" stroke="#6ee7b7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </span>
+            <h3>Register Admin</h3>
+            <p>Onboard a new authorized administrator.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Proceed to Register", key="menu_admin_reg", use_container_width=True):
+            goto("admin_register")
+            
+    with ac2:
+        st.markdown("""
+        <div class="panel-card">
+            <span class="icon">
+                <svg width="68" height="68" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 8px 16px rgba(244,63,94,0.4));">
+                    <defs>
+                        <linearGradient id="alogGrad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#f43f5e"/>
+                            <stop offset="1" stop-color="#be123c"/>
+                        </linearGradient>
+                    </defs>
+                    <rect x="5" y="11" width="14" height="10" rx="2" fill="url(#alogGrad)" fill-opacity="0.9" stroke="#fda4af" stroke-width="1.5"/>
+                    <path d="M8 11V7C8 4.79086 9.79086 3 12 3C14.2091 3 16 4.79086 16 7V11" stroke="#fda4af" stroke-width="2" stroke-linecap="round"/>
+                    <circle cx="12" cy="16" r="1.5" fill="#ffffff"/>
+                </svg>
+            </span>
+            <h3>Admin Login</h3>
+            <p>Access the core election dashboard.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Proceed to Login", key="menu_admin_login", use_container_width=True):
+            goto("admin_login")
 
-    st.markdown('<div class="section-title">Admin Console</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-sub">Authorized personnel only.</div>', unsafe_allow_html=True)
+if st.session_state.page == "admin_register":
+    st.markdown('<div class="section-title">🆕 Register Admin</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    key  = st.text_input("Admin Secret Key", type="password", placeholder="Issued by system owner", key="admin_key")
+    name = st.text_input("Admin Username", key="admin_name")
+    pwd  = st.text_input("Password", type="password", key="admin_pwd")
+    if st.button("Register as Admin", key="admin_reg"):
+        if not admin_key_valid(key):
+            st.error("❌ Invalid admin key.")
+        elif user_exists(name):
+            st.error("❌ Username already taken.")
+        else:
+            save_user(name, {"password": hash_data(pwd), "role": "admin"})
+            st.success("✅ Admin account created. You can now log in.")
+    st.markdown('</div>', unsafe_allow_html=True)
+    if st.button("← Back to Menu", key="back_from_areg"):
+        goto("admin")
 
-    tab1, tab2 = st.tabs(["🆕  Register Admin", "🔐  Admin Login"])
-
-    with tab1:
-        key  = st.text_input("Admin Secret Key", type="password", placeholder="Issued by system owner", key="admin_key")
-        name = st.text_input("Admin Username", key="admin_name")
-        pwd  = st.text_input("Password", type="password", key="admin_pwd")
-        if st.button("Register as Admin", key="admin_reg"):
-            if not admin_key_valid(key):
-                st.error("❌ Invalid admin key.")
-            elif user_exists(name):
-                st.error("❌ Username already taken.")
-            else:
-                save_user(name, {"password": hash_data(pwd), "role": "admin"})
-                st.success("✅ Admin account created. You can now log in.")
-
-    with tab2:
-        a_name = st.text_input("Admin Username", key="admin_login_name")
-        a_pwd  = st.text_input("Password", type="password", key="admin_login_pwd")
-        if st.button("🔓 Login as Admin", key="admin_login_btn"):
-            doc = get_user(a_name)
-            if doc and doc["password"] == hash_data(a_pwd) and doc.get("role") == "admin":
-                st.session_state.admin = a_name
-                goto("dashboard")
-            else:
-                st.error("❌ Invalid credentials or not an admin account.")
+if st.session_state.page == "admin_login":
+    st.markdown('<div class="section-title">🔐 Admin Login</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    a_name = st.text_input("Admin Username", key="admin_login_name")
+    a_pwd  = st.text_input("Password", type="password", key="admin_login_pwd")
+    if st.button("🔓 Login as Admin", key="admin_login_btn"):
+        doc = get_user(a_name)
+        if doc and doc["password"] == hash_data(a_pwd) and doc.get("role") == "admin":
+            st.session_state.admin = a_name
+            goto("dashboard")
+        else:
+            st.error("❌ Invalid credentials or not an admin account.")
+    st.markdown('</div>', unsafe_allow_html=True)
+    if st.button("← Back to Menu", key="back_from_alogin"):
+        goto("admin")
 
 # ═══════════════════════════════════════════════════════════
 # PAGE: DASHBOARD
@@ -1354,7 +1462,7 @@ if st.session_state.page == "assistant":
                 try:
                     # Request stream from Groq
                     stream = client.chat.completions.create(
-                        model="llama3-70b-8192", 
+                        model="mixtral-8x7b-32768", 
                         messages=st.session_state.messages,
                         stream=True,
                     )
