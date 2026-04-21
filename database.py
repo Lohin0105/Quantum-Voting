@@ -20,6 +20,8 @@ queries_col       = db["queries"]
 settings_col      = db["settings"]
 activity_log_col  = db["activity_log"]
 receipts_col      = db["receipts"]
+polls_col         = db["polls"]
+poll_votes_col    = db["poll_votes"]
 
 # ============================================================
 # USERS
@@ -248,3 +250,100 @@ def save_receipt(voter_id, receipt_hash):
 def get_receipt(voter_id):
     doc = receipts_col.find_one({"voter_id": voter_id})
     return doc["receipt"] if doc else None
+
+
+# ============================================================
+# POLLS
+# ============================================================
+def create_poll(name, description, start_time, end_time, created_by):
+    import uuid
+    poll_id = str(uuid.uuid4())[:8].upper()
+    polls_col.insert_one({
+        "poll_id": poll_id, "name": name, "description": description,
+        "start_time": start_time, "end_time": end_time,
+        "created_by": created_by, "email_sent": False,
+        "created_at": datetime.utcnow()
+    })
+    return poll_id
+
+def get_all_polls():
+    return list(polls_col.find({}, {"_id": 0}).sort("created_at", -1))
+
+def get_poll(poll_id):
+    return polls_col.find_one({"poll_id": poll_id}, {"_id": 0})
+
+def delete_poll(poll_id):
+    polls_col.delete_one({"poll_id": poll_id})
+    candidates_col.delete_many({"poll_id": poll_id})
+    poll_votes_col.delete_many({"poll_id": poll_id})
+
+def mark_poll_email_sent(poll_id):
+    polls_col.update_one({"poll_id": poll_id}, {"$set": {"email_sent": True}})
+
+def get_active_poll():
+    now = datetime.utcnow()
+    return polls_col.find_one(
+        {"start_time": {"$lte": now}, "end_time": {"$gte": now}},
+        {"_id": 0}
+    )
+
+def get_upcoming_poll():
+    now = datetime.utcnow()
+    return polls_col.find_one(
+        {"start_time": {"$gt": now}}, {"_id": 0},
+        sort=[("start_time", 1)]
+    )
+
+
+# ============================================================
+# POLL CANDIDATES (with AI symbol images)
+# ============================================================
+def add_poll_candidate(poll_id, name, party, symbol_name, symbol_image_b64=""):
+    if candidates_col.find_one({"poll_id": poll_id, "name": name}):
+        return False
+    candidates_col.insert_one({
+        "poll_id": poll_id, "name": name, "party": party,
+        "symbol": symbol_name, "symbol_image_b64": symbol_image_b64,
+        "added_at": datetime.utcnow()
+    })
+    return True
+
+def get_poll_candidates(poll_id):
+    return list(candidates_col.find({"poll_id": poll_id}, {"_id": 0}))
+
+def remove_poll_candidate(poll_id, name):
+    candidates_col.delete_one({"poll_id": poll_id, "name": name})
+
+def update_poll_candidate_image(poll_id, name, image_b64):
+    candidates_col.update_one(
+        {"poll_id": poll_id, "name": name},
+        {"$set": {"symbol_image_b64": image_b64}}
+    )
+
+
+# ============================================================
+# POLL VOTES
+# ============================================================
+def save_poll_vote(poll_id, vote_id, candidate):
+    poll_votes_col.update_one(
+        {"poll_id": poll_id, "vote_id": vote_id},
+        {"$set": {"poll_id": poll_id, "vote_id": vote_id,
+                  "candidate": candidate, "timestamp": datetime.utcnow()}},
+        upsert=True
+    )
+
+def has_voted_in_poll(poll_id, vote_id):
+    return poll_votes_col.find_one({"poll_id": poll_id, "vote_id": vote_id}) is not None
+
+def get_poll_vote_counts(poll_id):
+    pipeline = [
+        {"$match": {"poll_id": poll_id}},
+        {"$group": {"_id": "$candidate", "count": {"$sum": 1}}}
+    ]
+    result = {}
+    for doc in poll_votes_col.aggregate(pipeline):
+        result[doc["_id"]] = doc["count"]
+    return result
+
+def total_poll_votes(poll_id):
+    return poll_votes_col.count_documents({"poll_id": poll_id})
