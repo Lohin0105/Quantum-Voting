@@ -404,6 +404,53 @@ h1, h2, h3 { color: #e2e8f0 !important; }
   color: #94a3b8 !important;
   font-weight: 600 !important;
 }
+
+/* ══════════════════════════════════════════
+   MOBILE RESPONSIVENESS
+══════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .block-container {
+    padding: 1.5rem 1rem 3rem !important;
+  }
+  .hero-wrap {
+    padding: 1.5rem 0.5rem 1.5rem;
+  }
+  .hero-title {
+    font-size: 2.2rem !important;
+  }
+  .hero-sub {
+    font-size: 0.95rem;
+  }
+  .panel-card {
+    padding: 1.5rem 1rem;
+    margin-bottom: 15px;
+  }
+  .card {
+    padding: 1.2rem;
+  }
+  .stat-row {
+    gap: 8px;
+  }
+  .stat-chip {
+    padding: 0.8rem;
+    min-width: 46%; /* Forces 2x2 grid on mobile */
+  }
+  .stat-chip .num {
+    font-size: 1.4rem;
+  }
+  .cand-card {
+    padding: 1rem;
+    gap: 10px;
+  }
+  .result-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .result-bar-wrap {
+    width: 100%;
+  }
+}
 </style>
 """, unsafe_allow_html=True)
 
