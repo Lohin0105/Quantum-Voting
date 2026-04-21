@@ -935,19 +935,19 @@ if st.session_state.page == "user_login":
                     send_otp_email(l_email, st.session_state.otp)
                     st.success("New OTP sent!")
             st.markdown('</div>', unsafe_allow_html=True)
-    
+    else:
+        st.markdown('<div class="card" style="border-color:#10b981; background: rgba(16,185,129,0.05);">', unsafe_allow_html=True)
+        st.markdown('<h4 style="color:#10b981; margin:0;">✅ OTP Verified — Logging you in...</h4>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        username = st.session_state.get("login_username")
+        st.session_state.login_otp_sent = False
+        st.session_state.login_otp_verified = False
+        st.session_state.user = username
+        time.sleep(1)
+        goto("vote")
+
     if st.button("← Back to Menu", key="back_from_login"):
         goto("user")
-        else:
-            st.markdown('<div class="card" style="border-color:#10b981; background: rgba(16,185,129,0.05);">', unsafe_allow_html=True)
-            st.markdown('<h4 style="color:#10b981; margin:0;">✅ OTP Verified — Logging you in...</h4>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-            username = st.session_state.get("login_username")
-            st.session_state.login_otp_sent = False
-            st.session_state.login_otp_verified = False
-            st.session_state.user = username
-            time.sleep(1)
-            goto("vote")
 
 # ═══════════════════════════════════════════════════════════
 # PAGE: VOTE
