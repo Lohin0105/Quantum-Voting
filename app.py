@@ -1796,17 +1796,26 @@ if st.session_state.page == "results":
             cands_list = list(vote_counts.keys())
             counts_list = list(vote_counts.values())
             cols_palette = ["#6366f1","#06b6d4","#10b981","#f59e0b","#f43f5e"]
-            fig = go.Figure(go.Bar(
-                x=cands_list, y=counts_list,
-                marker_color=cols_palette[:len(cands_list)],
-                text=[f"{v} votes ({round(v/total*100,1)}%)" for v in counts_list],
-                textposition="outside",
+            # Candidate Vote Pie Chart
+            fig = go.Figure(go.Pie(
+                labels=cands_list,
+                values=counts_list,
+                hole=0.45,
+                marker=dict(colors=cols_palette[:len(cands_list)],
+                            line=dict(color='#0f172a', width=3)),
+                textinfo="label+percent",
+                textfont=dict(color="#e2e8f0", size=14),
+                hovertemplate="<b>%{label}</b><br>Votes: %{value}<br>Share: %{percent}<extra></extra>",
             ))
             fig.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
                 font=dict(color="#e2e8f0", family="Inter"),
-                yaxis=dict(gridcolor="rgba(255,255,255,0.05)"),
-                margin=dict(t=40,b=20,l=10,r=10), showlegend=False,
+                margin=dict(t=30,b=30,l=20,r=20),
+                showlegend=True,
+                legend=dict(font=dict(color="#94a3b8", size=13),
+                            bgcolor="rgba(0,0,0,0)"),
+                annotations=[dict(text=f"<b>{total}</b><br><span style='font-size:10px'>Total Votes</span>",
+                                  font=dict(size=18, color="#a5b4fc"), showarrow=False)]
             )
             st.plotly_chart(fig, use_container_width=True)
         else:
@@ -1871,38 +1880,40 @@ if st.session_state.page == "dashboard" and st.session_state.get("admin"):
         total_pdf = sum(vote_counts_pdf.values()) if vote_counts_pdf else 0
         if not vote_counts_pdf:
             st.info("No votes cast yet.")
-        elif FPDF is None:
-            st.warning("fpdf2 not installed. Run: python -m pip install fpdf2")
         else:
             if st.button("📥 Generate PDF Report", key="gen_pdf"):
-                pdf = FPDF()
-                pdf.add_page()
-                pdf.set_font("Helvetica", "B", 20)
-                pdf.cell(0, 12, "QuVote - Official Election Results", ln=True, align="C")
-                pdf.set_font("Helvetica", "", 11)
-                pdf.cell(0, 8, f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}", ln=True, align="C")
-                pdf.ln(8)
-                pdf.set_font("Helvetica", "B", 13)
-                pdf.cell(0, 10, f"Total Votes Cast: {total_pdf}", ln=True)
-                pdf.cell(0, 10, f"Eligible Voters: {total_eligible_voters()}", ln=True)
-                pdf.ln(6)
-                pdf.set_font("Helvetica", "B", 12)
-                pdf.cell(80, 10, "Candidate", border=1)
-                pdf.cell(40, 10, "Votes", border=1)
-                pdf.cell(40, 10, "Share %", border=1, ln=True)
-                pdf.set_font("Helvetica", "", 11)
-                for c, v in vote_counts_pdf.items():
-                    pct = round(v/total_pdf*100, 2) if total_pdf else 0
-                    pdf.cell(80, 10, c, border=1)
-                    pdf.cell(40, 10, str(v), border=1)
-                    pdf.cell(40, 10, f"{pct}%", border=1, ln=True)
-                if vote_counts_pdf:
-                    w = max(vote_counts_pdf, key=vote_counts_pdf.get)
+                try:
+                    from fpdf import FPDF as _FPDF
+                    pdf = _FPDF()
+                    pdf.add_page()
+                    pdf.set_font("Helvetica", "B", 20)
+                    pdf.cell(0, 12, "QuVote - Official Election Results", ln=True, align="C")
+                    pdf.set_font("Helvetica", "", 11)
+                    pdf.cell(0, 8, f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}", ln=True, align="C")
                     pdf.ln(8)
-                    pdf.set_font("Helvetica", "B", 14)
-                    pdf.cell(0, 12, f"WINNER: {w}", ln=True, align="C")
-                st.download_button("⬇️ Download PDF", data=bytes(pdf.output()),
-                                   file_name="QuVote_Results.pdf", mime="application/pdf")
+                    pdf.set_font("Helvetica", "B", 13)
+                    pdf.cell(0, 10, f"Total Votes Cast: {total_pdf}", ln=True)
+                    pdf.cell(0, 10, f"Eligible Voters: {total_eligible_voters()}", ln=True)
+                    pdf.ln(6)
+                    pdf.set_font("Helvetica", "B", 12)
+                    pdf.cell(80, 10, "Candidate", border=1)
+                    pdf.cell(40, 10, "Votes", border=1)
+                    pdf.cell(40, 10, "Share %", border=1, ln=True)
+                    pdf.set_font("Helvetica", "", 11)
+                    for c, v in vote_counts_pdf.items():
+                        pct = round(v/total_pdf*100, 2) if total_pdf else 0
+                        pdf.cell(80, 10, c, border=1)
+                        pdf.cell(40, 10, str(v), border=1)
+                        pdf.cell(40, 10, f"{pct}%", border=1, ln=True)
+                    if vote_counts_pdf:
+                        w = max(vote_counts_pdf, key=vote_counts_pdf.get)
+                        pdf.ln(8)
+                        pdf.set_font("Helvetica", "B", 14)
+                        pdf.cell(0, 12, f"WINNER: {w}", ln=True, align="C")
+                    st.download_button("⬇️ Download PDF", data=bytes(pdf.output()),
+                                       file_name="QuVote_Results.pdf", mime="application/pdf")
+                except Exception as e:
+                    st.error(f"PDF Error: {e}")
 
     with st.expander("🕵️ Suspicious Activity Alerts"):
         suspicious = get_suspicious_ips()
