@@ -669,7 +669,7 @@ if st.session_state.page == "home":
             <p>Register, verify your identity, and cast your secure quantum vote.</p>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("Enter Voter Portal", key="home_user"):
+        if st.button("Enter Voter Portal", key="home_user", use_container_width=True):
             goto("user")
 
     with col2:
@@ -680,7 +680,7 @@ if st.session_state.page == "home":
             <p>Manage candidates, voter rolls, and view live election results.</p>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("Enter Admin Console", key="home_admin"):
+        if st.button("Enter Admin Console", key="home_admin", use_container_width=True):
             goto("admin")
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
