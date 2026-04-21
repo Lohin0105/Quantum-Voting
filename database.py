@@ -1,6 +1,7 @@
 import os
 from pymongo import MongoClient
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
@@ -16,6 +17,9 @@ valid_voters_col  = db["valid_voters"]
 admin_keys_col    = db["admin_keys"]
 candidates_col    = db["candidates"]
 queries_col       = db["queries"]
+settings_col      = db["settings"]
+activity_log_col  = db["activity_log"]
+receipts_col      = db["receipts"]
 
 # ============================================================
 # USERS
@@ -79,7 +83,7 @@ def get_votes():
 def save_vote(vote_id, candidate):
     votes_col.update_one(
         {"vote_id": vote_id},
-        {"$set": {"vote_id": vote_id, "candidate": candidate}},
+        {"$set": {"vote_id": vote_id, "candidate": candidate, "timestamp": datetime.utcnow()}},
         upsert=True
     )
 
@@ -106,7 +110,6 @@ def get_valid_voter(vote_id):
     return None
 
 def add_valid_voter(vote_id, name):
-    """Admin adds a real voter to the roll."""
     valid_voters_col.update_one(
         {"vote_id": vote_id},
         {"$setOnInsert": {"vote_id": vote_id, "name": name, "voted": False}},
@@ -142,7 +145,7 @@ def get_candidate_names():
 
 def add_candidate(name, party, symbol):
     if candidates_col.find_one({"name": name}):
-        return False  # already exists
+        return False
     candidates_col.insert_one({"name": name, "party": party, "symbol": symbol})
     return True
 
@@ -168,7 +171,6 @@ def get_queries():
     return list(queries_col.find({}, {"_id": 1, "user": 1, "question": 1, "reply": 1, "created_at": 1}))
 
 def save_query(user, question):
-    from datetime import datetime
     queries_col.insert_one({
         "user": user,
         "question": question,
@@ -182,3 +184,67 @@ def reply_query(query_id, reply_text):
         {"_id": ObjectId(query_id)},
         {"$set": {"reply": reply_text}}
     )
+
+# ============================================================
+# SETTINGS (Election end time, winner announced)
+# ============================================================
+def get_setting(key, default=None):
+    doc = settings_col.find_one({"key": key})
+    return doc["value"] if doc else default
+
+def set_setting(key, value):
+    settings_col.update_one(
+        {"key": key},
+        {"$set": {"key": key, "value": value}},
+        upsert=True
+    )
+
+def get_election_end_time():
+    """Returns datetime or None."""
+    return get_setting("election_end_time", None)
+
+def set_election_end_time(dt):
+    set_setting("election_end_time", dt)
+
+def get_winner_announced():
+    return get_setting("winner_announced", False)
+
+def set_winner_announced(val):
+    set_setting("winner_announced", val)
+
+# ============================================================
+# ACTIVITY LOG (Suspicious IP tracking)
+# ============================================================
+def log_activity(voter_id, ip, action):
+    activity_log_col.insert_one({
+        "voter_id": voter_id,
+        "ip": ip,
+        "action": action,
+        "timestamp": datetime.utcnow()
+    })
+
+def get_suspicious_ips():
+    """Returns list of IPs that appear with more than one voter_id."""
+    pipeline = [
+        {"$match": {"action": "vote"}},
+        {"$group": {"_id": "$ip", "voter_ids": {"$addToSet": "$voter_id"}, "count": {"$sum": 1}}},
+        {"$match": {"count": {"$gt": 1}}}
+    ]
+    return list(activity_log_col.aggregate(pipeline))
+
+def get_all_activity():
+    return list(activity_log_col.find({}, {"_id": 0}).sort("timestamp", -1).limit(200))
+
+# ============================================================
+# VOTE RECEIPTS
+# ============================================================
+def save_receipt(voter_id, receipt_hash):
+    receipts_col.update_one(
+        {"voter_id": voter_id},
+        {"$set": {"voter_id": voter_id, "receipt": receipt_hash, "issued_at": datetime.utcnow()}},
+        upsert=True
+    )
+
+def get_receipt(voter_id):
+    doc = receipts_col.find_one({"voter_id": voter_id})
+    return doc["receipt"] if doc else None

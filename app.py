@@ -2,11 +2,21 @@ import streamlit as st
 import hashlib, time, secrets, requests, os, base64
 import cv2, numpy as np
 from dotenv import load_dotenv
+from datetime import datetime, timezone
 load_dotenv()
 try:
     import openai
 except ImportError:
     openai = None
+try:
+    import plotly.graph_objects as go
+    import plotly.express as px
+except ImportError:
+    go = px = None
+try:
+    from fpdf import FPDF
+except ImportError:
+    FPDF = None
 from database import (
     get_user, user_exists, vote_id_taken, save_user,
     admin_key_valid, get_valid_voter, mark_voter_registered,
@@ -16,7 +26,11 @@ from database import (
     remove_candidate, candidate_count,
     add_valid_voter, remove_valid_voter, get_all_valid_voters,
     get_all_users, delete_user, get_pending_users, approve_user, delete_pending_user, save_pending_user,
-    get_queries, save_query, reply_query
+    get_queries, save_query, reply_query,
+    get_election_end_time, set_election_end_time,
+    get_winner_announced, set_winner_announced,
+    log_activity, get_suspicious_ips, get_all_activity,
+    save_receipt, get_receipt, get_setting, set_setting
 )
 
 # ═══════════════════════════════════════════════════════════
@@ -505,6 +519,88 @@ def get_grok_client():
         base_url="https://api.groq.com/openai/v1"
     )
 
+def generate_receipt(voter_id, candidate, salt="QuVote2025"):
+    raw = f"{voter_id}|{candidate}|{salt}|{time.time()}"
+    return hashlib.sha256(raw.encode()).hexdigest().upper()
+
+def get_voter_ip():
+    try:
+        headers = st.context.headers
+        ip = headers.get("X-Forwarded-For", headers.get("X-Real-IP", "unknown"))
+        return ip.split(",")[0].strip()
+    except Exception:
+        return "unknown"
+
+def send_results_email_blast(winner, vote_counts, total):
+    """Send election results email to all registered voters."""
+    try:
+        import sendgrid
+        from sendgrid.helpers.mail import Mail
+        sg = sendgrid.SendGridAPIClient(api_key=os.environ.get('SENDGRID_API_KEY', ''))
+        from_email = os.environ.get('SENDGRID_FROM_EMAIL', 'quantumvoting@outlook.com')
+        breakdown = "".join([
+            f"<tr><td style='padding:8px;border-bottom:1px solid #1e293b;'>{c}</td>"
+            f"<td style='padding:8px;border-bottom:1px solid #1e293b;text-align:center;color:#a5b4fc;font-weight:700;'>{v}</td>"
+            f"<td style='padding:8px;border-bottom:1px solid #1e293b;text-align:center;color:#64748b;'>{round(v/total*100,1) if total else 0}%</td></tr>"
+            for c, v in vote_counts.items()
+        ])
+        html = f"""
+        <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#0f172a;color:#e2e8f0;border-radius:12px;overflow:hidden;">
+          <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:28px;text-align:center;">
+            <h2 style="margin:0;color:#fff;">⚛️ QuVote — Election Results</h2>
+          </div>
+          <div style="padding:32px;">
+            <div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:12px;padding:20px;text-align:center;margin-bottom:24px;">
+              <div style="font-size:1rem;color:#6ee7b7;margin-bottom:4px;">🏆 WINNER</div>
+              <div style="font-size:2rem;font-weight:800;color:#fff;">{winner}</div>
+            </div>
+            <p style="color:#94a3b8;">Total votes cast: <strong style="color:#a5b4fc;">{total}</strong></p>
+            <table style="width:100%;border-collapse:collapse;margin-top:12px;">
+              <thead><tr>
+                <th style="text-align:left;padding:8px;color:#64748b;font-size:0.85rem;">Candidate</th>
+                <th style="text-align:center;padding:8px;color:#64748b;font-size:0.85rem;">Votes</th>
+                <th style="text-align:center;padding:8px;color:#64748b;font-size:0.85rem;">Share</th>
+              </tr></thead>
+              <tbody>{breakdown}</tbody>
+            </table>
+            <p style="margin-top:24px;color:#475569;font-size:0.82rem;">This is an automated message from QuVote. Thank you for participating in our democratic process.</p>
+          </div>
+        </div>"""
+        users = get_all_users()
+        sent = 0
+        for u in users:
+            email = u.get("email")
+            if email:
+                msg = Mail(from_email=from_email, to_emails=email,
+                           subject="QuVote — Election Results Announced!", html_content=html)
+                try:
+                    sg.send(msg)
+                    sent += 1
+                except Exception:
+                    pass
+        return sent
+    except Exception as e:
+        print(f"[BLAST ERROR] {e}")
+        return 0
+
+def check_and_announce_winner():
+    """Check if election has ended and announce results if not done yet."""
+    end_time = get_election_end_time()
+    if not end_time:
+        return None
+    now = datetime.now(timezone.utc)
+    if hasattr(end_time, 'tzinfo') and end_time.tzinfo is None:
+        end_time = end_time.replace(tzinfo=timezone.utc)
+    if now >= end_time and not get_winner_announced():
+        vote_counts = get_vote_counts()
+        if vote_counts:
+            winner = max(vote_counts, key=vote_counts.get)
+            total = sum(vote_counts.values())
+            set_winner_announced(True)
+            send_results_email_blast(winner, vote_counts, total)
+            return winner
+    return None
+
 def quantum_otp():
     try:
         res = requests.get(
@@ -700,6 +796,7 @@ if not st.session_state.get("splash_done", False):
         time.sleep(2)
         st.rerun()
 
+
 # ═══════════════════════════════════════════════════════════
 # NAV BAR
 # ═══════════════════════════════════════════════════════════
@@ -711,6 +808,9 @@ if st.session_state.page != "home":
             st.query_params.clear()
             goto("home")
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+
+# Auto-check winner announcement on every page load
+check_and_announce_winner()
 
 # ═══════════════════════════════════════════════════════════
 # PAGE: HOME
@@ -807,6 +907,52 @@ if st.session_state.page == "home":
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
+    # Winner Banner
+    if get_winner_announced():
+        vote_counts = get_vote_counts()
+        if vote_counts:
+            winner = max(vote_counts, key=vote_counts.get)
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(99,102,241,0.1));
+                 border:1px solid rgba(16,185,129,0.4);border-radius:16px;padding:1.5rem;text-align:center;margin:1rem 0;">
+                <div style="font-size:2rem;margin-bottom:6px;">🏆</div>
+                <div style="color:#6ee7b7;font-weight:700;font-size:1.1rem;">Election Results Declared!</div>
+                <div style="color:#fff;font-size:1.6rem;font-weight:800;margin:8px 0;">{winner}</div>
+                <div style="color:#64748b;font-size:0.88rem;">Results have been emailed to all registered voters.</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # Election Countdown Timer
+    end_time = get_election_end_time()
+    if end_time and not get_winner_announced():
+        import pytz
+        end_iso = end_time.strftime('%Y-%m-%dT%H:%M:%SZ') if hasattr(end_time, 'strftime') else str(end_time)
+        st.markdown(f"""
+        <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);
+             border-radius:16px;padding:1.4rem;text-align:center;margin:1rem 0;">
+            <div style="color:#94a3b8;font-size:0.85rem;margin-bottom:6px;">⏳ Polls close in</div>
+            <div id="countdown" style="font-family:'Space Grotesk',sans-serif;font-size:2rem;
+                 font-weight:800;color:#a5b4fc;letter-spacing:0.05em;">Loading...</div>
+        </div>
+        <script>
+        (function(){{
+            var end = new Date('{end_iso}').getTime();
+            function update(){{
+                var now = new Date().getTime();
+                var diff = end - now;
+                if(diff <= 0){{ document.getElementById('countdown').innerHTML='Polls Closed'; return; }}
+                var d=Math.floor(diff/86400000);
+                var h=Math.floor((diff%86400000)/3600000);
+                var m=Math.floor((diff%3600000)/60000);
+                var s=Math.floor((diff%60000)/1000);
+                document.getElementById('countdown').innerHTML=
+                    (d>0?d+'d ':'')+('0'+h).slice(-2)+'h '+('0'+m).slice(-2)+'m '+('0'+s).slice(-2)+'s';
+            }}
+            update(); setInterval(update,1000);
+        }})();
+        </script>
+        """, unsafe_allow_html=True)
+
     # Live stats
     ev = total_eligible_voters()
     vt = total_votes_cast()
@@ -823,7 +969,15 @@ if st.session_state.page == "home":
     """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<p style="text-align:center;color:#334155;font-size:0.8rem;">📧 quantumvoting@gmail.com &nbsp;|&nbsp; Built with ⚛️ Quantum Randomness</p>', unsafe_allow_html=True)
+    hc1, hc2, hc3 = st.columns(3)
+    with hc1:
+        if st.button("📊 Live Results", key="home_results", use_container_width=True):
+            goto("results")
+    with hc2:
+        if st.button("❓ FAQ", key="home_faq", use_container_width=True):
+            goto("faq")
+    with hc3:
+        st.markdown('<p style="text-align:center;color:#334155;font-size:0.75rem;padding-top:0.6rem;">📧 quantumvoting@gmail.com</p>', unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════
 # PAGE: USER PANEL
@@ -1043,17 +1197,46 @@ if st.session_state.page == "vote":
             if st.button("🗳️ Submit Vote", key="vote_submit"):
                 save_vote(vid, choice)
                 mark_voted(vid)
-                st.success(f"✅ Vote cast for **{choice}**! Your vote is securely recorded.")
-                time.sleep(1.5)
+                # Generate and save receipt
+                receipt = generate_receipt(vid, choice)
+                save_receipt(vid, receipt)
+                # Log IP for suspicious activity tracking
+                voter_ip = get_voter_ip()
+                log_activity(vid, voter_ip, "vote")
+                st.session_state["last_receipt"] = receipt
+                st.session_state["last_choice"] = choice
                 st.rerun()
+
+    # Show receipt if just voted
+    if st.session_state.get("last_receipt"):
+        receipt = st.session_state["last_receipt"]
+        choice_done = st.session_state.get("last_choice", "")
+        st.markdown(f"""
+        <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.3);
+             border-radius:16px;padding:1.5rem;margin:1rem 0;">
+            <div style="text-align:center;margin-bottom:1rem;">
+                <div style="font-size:2rem;">🧾</div>
+                <div style="font-weight:700;color:#a5b4fc;font-size:1.1rem;">Your Vote Receipt</div>
+                <div style="color:#64748b;font-size:0.82rem;margin-top:4px;">Keep this for your records. It proves your vote was recorded.</div>
+            </div>
+            <div style="background:#0f172a;border-radius:8px;padding:1rem;font-family:monospace;
+                 font-size:0.75rem;color:#6ee7b7;word-break:break-all;text-align:center;">{receipt}</div>
+            <div style="text-align:center;margin-top:0.8rem;color:#64748b;font-size:0.82rem;">
+                ✅ Vote cast for: <strong style="color:#a5b4fc;">{choice_done}</strong>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("📩 Submit a Query", key="query_btn"):
             goto("query")
     with col2:
+        if st.button("👤 My Dashboard", key="voter_dash_btn"):
+            goto("voter_dashboard")
+    with col3:
         if st.button("🚪 Logout", key="logout_user"):
             st.session_state.clear()
             goto("home")
@@ -1513,5 +1696,219 @@ if st.session_state.page == "assistant":
                     message_placeholder.markdown(full_response)
                     # Add assistant response to chat history
                     st.session_state.messages.append({"role": "assistant", "content": full_response})
+                    st.session_state.messages.append({"role": "assistant", "content": full_response})
                 except Exception as e:
                     st.error(f"Error communicating with AI: {str(e)}")
+
+# ═══════════════════════════════════════════════════════════
+# PAGE: VOTER DASHBOARD
+# ═══════════════════════════════════════════════════════════
+if st.session_state.page == "voter_dashboard":
+    username = st.session_state.get("user")
+    if not username:
+        st.warning("Please login first.")
+        if st.button("Back to Home", key="vd_back_anon"): goto("home")
+    else:
+        user_doc = get_user(username)
+        vid = user_doc.get("vote_id", "") if user_doc else ""
+        vv = get_valid_voter(vid) if vid else None
+        has_voted = vv.get("voted", False) if vv else False
+        receipt = get_receipt(vid) if vid else None
+        st.markdown('<div class="section-title">👤 My Voter Dashboard</div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1rem 0;">
+            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.2rem;">
+                <div style="color:#64748b;font-size:0.8rem;">Full Name</div>
+                <div style="color:#e2e8f0;font-weight:600;margin-top:4px;">{user_doc.get('name','—') if user_doc else '—'}</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.2rem;">
+                <div style="color:#64748b;font-size:0.8rem;">Voter ID</div>
+                <div style="color:#e2e8f0;font-weight:600;margin-top:4px;">{vid or '—'}</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.2rem;">
+                <div style="color:#64748b;font-size:0.8rem;">Email</div>
+                <div style="color:#e2e8f0;font-weight:600;margin-top:4px;">{user_doc.get('email','—') if user_doc else '—'}</div>
+            </div>
+            <div style="background:{'rgba(16,185,129,0.1)' if has_voted else 'rgba(245,158,11,0.1)'};border:1px solid {'rgba(16,185,129,0.3)' if has_voted else 'rgba(245,158,11,0.3)'};border-radius:12px;padding:1.2rem;">
+                <div style="color:#64748b;font-size:0.8rem;">Vote Status</div>
+                <div style="color:{'#6ee7b7' if has_voted else '#fcd34d'};font-weight:700;margin-top:4px;">{'✅ Voted' if has_voted else '⏳ Not Yet Voted'}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if receipt:
+            st.markdown(f"""
+            <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:1.2rem;margin-top:0.5rem;">
+                <div style="color:#94a3b8;font-size:0.82rem;margin-bottom:8px;">🧾 Your Vote Receipt</div>
+                <div style="font-family:monospace;font-size:0.72rem;color:#6ee7b7;word-break:break-all;">{receipt}</div>
+            </div>""", unsafe_allow_html=True)
+        st.markdown("---")
+        st.markdown("**📋 Registered Candidates**")
+        for c in get_candidates():
+            st.markdown(f'<div class="cand-card"><span class="cand-symbol">{c.get("symbol","🗳️")}</span><div class="cand-info"><h4>{c["name"]}</h4><p>{c.get("party","Independent")}</p></div></div>', unsafe_allow_html=True)
+        st.markdown("---")
+        if st.button("← Back to Vote Page", key="vd_back"):
+            goto("vote")
+
+# ═══════════════════════════════════════════════════════════
+# PAGE: FAQ
+# ═══════════════════════════════════════════════════════════
+if st.session_state.page == "faq":
+    st.markdown('<div class="section-title">❓ Frequently Asked Questions</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-sub">Everything you need to know about voting on QuVote.</div>', unsafe_allow_html=True)
+    st.markdown("---")
+    faqs = [
+        ("How do I register to vote?", "Click 'Enter Voter Portal' on the homepage, then select 'Register Voter'. Fill in your Voter ID, full name, email, and password. Your registration will be reviewed by the admin and you will be emailed once approved."),
+        ("What is OTP verification?", "OTP stands for One-Time Password — a 6-digit code sent to your email. QuVote uses a Quantum Random Number Generator to produce truly unpredictable OTPs, making your login impossible to guess."),
+        ("How long is the OTP valid?", "Each OTP is valid for 5 minutes only. If it expires, click 'Resend OTP' to receive a new one."),
+        ("Can I change my vote after submitting?", "No. Once you submit your vote, it is permanently and securely recorded. Each Voter ID can only cast one vote to ensure election integrity."),
+        ("How is my vote kept secure?", "Your vote is encrypted using SHA-256 hashing and stored in a secure MongoDB Atlas database. A unique receipt hash is generated for every vote."),
+        ("What is a Vote Receipt?", "After voting, QuVote generates a unique SHA-256 encrypted string — your vote receipt. It proves your vote was recorded without revealing your candidate choice."),
+        ("What if my registration was rejected?", "You will receive an email with the reason. Contact the admin at quantumvoting@gmail.com for clarification. Common reasons: Voter ID mismatch or unverified identity."),
+        ("When do polls close?", "The election admin sets the poll closing time. You can see a live countdown timer on the homepage. Once closed, no new votes are accepted."),
+        ("How are results announced?", "When polls close, QuVote automatically calculates the winner and emails all registered voters with the full results — winner name, total votes, and per-candidate breakdown."),
+        ("Who can I contact for help?", "Submit a query via the 'Submit a Query' button on the vote page, email quantumvoting@gmail.com, or ask our 24/7 Education Bot on the homepage.")
+    ]
+    for q, a in faqs:
+        with st.expander(f"🔹 {q}"):
+            st.markdown(f'<p style="color:#94a3b8;line-height:1.8;">{a}</p>', unsafe_allow_html=True)
+    st.markdown("---")
+    if st.button("← Back to Home", key="faq_back"):
+        goto("home")
+
+# ═══════════════════════════════════════════════════════════
+# PAGE: LIVE RESULTS
+# ═══════════════════════════════════════════════════════════
+if st.session_state.page == "results":
+    st.markdown('<div class="section-title">📊 Live Election Results</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-sub">Real-time vote counts and turnout statistics.</div>', unsafe_allow_html=True)
+    st.markdown("---")
+    vote_counts = get_vote_counts()
+    total = sum(vote_counts.values()) if vote_counts else 0
+    ev = total_eligible_voters()
+    not_voted = max(ev - total, 0)
+    if not vote_counts:
+        st.info("🗳️ No votes have been cast yet. Check back soon!")
+    else:
+        if get_winner_announced():
+            winner = max(vote_counts, key=vote_counts.get)
+            st.markdown(f'<div style="background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(99,102,241,0.1));border:1px solid rgba(16,185,129,0.4);border-radius:16px;padding:1.2rem;text-align:center;margin-bottom:1rem;"><div style="color:#6ee7b7;font-weight:700;font-size:1.1rem;">🏆 Winner: {winner}</div><div style="color:#64748b;font-size:0.85rem;">Election concluded — results are final.</div></div>', unsafe_allow_html=True)
+        if go:
+            cands_list = list(vote_counts.keys())
+            counts_list = list(vote_counts.values())
+            cols_palette = ["#6366f1","#06b6d4","#10b981","#f59e0b","#f43f5e"]
+            fig = go.Figure(go.Bar(
+                x=cands_list, y=counts_list,
+                marker_color=cols_palette[:len(cands_list)],
+                text=[f"{v} votes ({round(v/total*100,1)}%)" for v in counts_list],
+                textposition="outside",
+            ))
+            fig.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#e2e8f0", family="Inter"),
+                yaxis=dict(gridcolor="rgba(255,255,255,0.05)"),
+                margin=dict(t=40,b=20,l=10,r=10), showlegend=False,
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            for c, v in vote_counts.items():
+                pct = round(v/total*100,1) if total else 0
+                st.markdown(f"**{c}**: {v} votes ({pct}%)")
+                st.progress(pct/100)
+        st.markdown("### 🌍 Voter Turnout")
+        if go and ev > 0:
+            fig2 = go.Figure(go.Pie(
+                labels=["Voted","Not Yet Voted"], values=[total, not_voted], hole=0.6,
+                marker=dict(colors=["#6366f1","#1e293b"]),
+                textinfo="label+percent", textfont=dict(color="#e2e8f0",size=13),
+            ))
+            fig2.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#e2e8f0"),
+                margin=dict(t=20,b=20,l=20,r=20), showlegend=True,
+                legend=dict(font=dict(color="#94a3b8")),
+                annotations=[dict(text=f"<b>{round(total/ev*100,1) if ev else 0}%</b>",
+                                  font=dict(size=22,color="#a5b4fc"),showarrow=False)]
+            )
+            st.plotly_chart(fig2, use_container_width=True)
+    st.markdown("---")
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("🔄 Refresh", key="results_refresh"): st.rerun()
+    with c2:
+        if st.button("← Back to Home", key="results_back"): goto("home")
+
+# ═══════════════════════════════════════════════════════════
+# ADMIN EXTRA SECTIONS (injected into dashboard context)
+# ═══════════════════════════════════════════════════════════
+if st.session_state.page == "dashboard" and st.session_state.get("admin"):
+    import datetime as dt_mod
+    st.markdown("---")
+    st.markdown('<div class="section-title" style="font-size:1.1rem;">⚙️ Election Management</div>', unsafe_allow_html=True)
+
+    with st.expander("⏰ Set Election End Time"):
+        current_end = get_election_end_time()
+        st.markdown(f"**Current end time:** `{current_end} UTC`" if current_end else "**No end time set yet.**")
+        col_d, col_t = st.columns(2)
+        with col_d:
+            sel_date = st.date_input("End Date", key="admin_end_date")
+        with col_t:
+            sel_time = st.time_input("End Time (UTC)", key="admin_end_time")
+        if st.button("💾 Save Election End Time", key="save_end_time"):
+            combined = dt_mod.datetime.combine(sel_date, sel_time)
+            set_election_end_time(combined)
+            st.success(f"✅ Election will close at {combined} UTC")
+        if current_end:
+            if st.button("🏁 Force Announce Results Now", key="force_results"):
+                set_election_end_time(dt_mod.datetime.utcnow() - dt_mod.timedelta(seconds=1))
+                set_winner_announced(False)
+                winner = check_and_announce_winner()
+                if winner:
+                    st.success(f"🏆 Results announced! Winner: **{winner}**")
+                else:
+                    st.warning("No votes to determine a winner yet.")
+
+    with st.expander("📄 Download PDF Results Report"):
+        vote_counts_pdf = get_vote_counts()
+        total_pdf = sum(vote_counts_pdf.values()) if vote_counts_pdf else 0
+        if not vote_counts_pdf:
+            st.info("No votes cast yet.")
+        elif FPDF is None:
+            st.warning("fpdf2 not installed. Run: python -m pip install fpdf2")
+        else:
+            if st.button("📥 Generate PDF Report", key="gen_pdf"):
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Helvetica", "B", 20)
+                pdf.cell(0, 12, "QuVote - Official Election Results", ln=True, align="C")
+                pdf.set_font("Helvetica", "", 11)
+                pdf.cell(0, 8, f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}", ln=True, align="C")
+                pdf.ln(8)
+                pdf.set_font("Helvetica", "B", 13)
+                pdf.cell(0, 10, f"Total Votes Cast: {total_pdf}", ln=True)
+                pdf.cell(0, 10, f"Eligible Voters: {total_eligible_voters()}", ln=True)
+                pdf.ln(6)
+                pdf.set_font("Helvetica", "B", 12)
+                pdf.cell(80, 10, "Candidate", border=1)
+                pdf.cell(40, 10, "Votes", border=1)
+                pdf.cell(40, 10, "Share %", border=1, ln=True)
+                pdf.set_font("Helvetica", "", 11)
+                for c, v in vote_counts_pdf.items():
+                    pct = round(v/total_pdf*100, 2) if total_pdf else 0
+                    pdf.cell(80, 10, c, border=1)
+                    pdf.cell(40, 10, str(v), border=1)
+                    pdf.cell(40, 10, f"{pct}%", border=1, ln=True)
+                if vote_counts_pdf:
+                    w = max(vote_counts_pdf, key=vote_counts_pdf.get)
+                    pdf.ln(8)
+                    pdf.set_font("Helvetica", "B", 14)
+                    pdf.cell(0, 12, f"WINNER: {w}", ln=True, align="C")
+                st.download_button("⬇️ Download PDF", data=bytes(pdf.output()),
+                                   file_name="QuVote_Results.pdf", mime="application/pdf")
+
+    with st.expander("🕵️ Suspicious Activity Alerts"):
+        suspicious = get_suspicious_ips()
+        if not suspicious:
+            st.success("✅ No suspicious activity detected.")
+        else:
+            st.warning(f"⚠️ {len(suspicious)} suspicious IP(s) found!")
+            for item in suspicious:
+                st.markdown(f'<div style="background:rgba(244,63,94,0.08);border:1px solid rgba(244,63,94,0.3);border-radius:8px;padding:0.8rem;margin:4px 0;"><strong style="color:#f43f5e;">IP: {item["_id"]}</strong><br><span style="color:#94a3b8;font-size:0.85rem;">Voter IDs: {", ".join(item["voter_ids"])}</span></div>', unsafe_allow_html=True)

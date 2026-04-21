@@ -6,3 +6,5 @@ pymongo
 python-dotenv
 sendgrid
 openai
+plotly
+fpdf2
