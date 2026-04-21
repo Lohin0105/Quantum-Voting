@@ -32,9 +32,11 @@ from database import (
     log_activity, get_suspicious_ips, get_all_activity,
     save_receipt, get_receipt, get_setting, set_setting,
     create_poll, get_all_polls, get_poll, delete_poll, mark_poll_email_sent,
-    get_active_poll, get_upcoming_poll,
+    get_active_poll, get_upcoming_poll, get_all_active_polls, get_all_upcoming_polls, get_past_polls,
     add_poll_candidate, get_poll_candidates, remove_poll_candidate, update_poll_candidate_image,
-    save_poll_vote, has_voted_in_poll, get_poll_vote_counts, total_poll_votes
+    save_poll_vote, has_voted_in_poll, get_poll_vote_counts, total_poll_votes,
+    get_ended_unannounced_polls, mark_poll_results_announced, get_poll_vote_record,
+    get_past_polls_for_voter
 )
 
 # ═══════════════════════════════════════════════════════════
@@ -143,52 +145,139 @@ html, body, [class*="css"], .stApp {
 /* ══════════════════════════════════════════
    CARDS
 ══════════════════════════════════════════ */
+/* ── CARDS & PANELS ───────────────────────── */
 .card {
   background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 20px;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 24px;
   padding: 2rem;
   margin: 1rem 0;
-  transition: border-color 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.card:hover { border-color: rgba(99,102,241,0.3); }
+.card:hover { 
+  border-color: rgba(99,102,241,0.4);
+  background: rgba(255,255,255,0.05);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+}
+
+.poll-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.poll-card-block {
+  background: linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  padding: 1.8rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+.poll-card-block:hover {
+  transform: translateY(-5px);
+  border-color: rgba(99,102,241,0.3);
+  box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+}
+.poll-card-block::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 4px;
+  background: var(--grad);
+  opacity: 0.8;
+}
+
+.btn-premium {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  background: var(--grad);
+  color: white !important;
+  border-radius: 12px;
+  font-weight: 700;
+  text-decoration: none !important;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.85rem;
+}
+.btn-premium:hover {
+  transform: scale(1.02);
+  filter: brightness(1.1);
+  box-shadow: 0 8px 20px rgba(99,102,241,0.4);
+}
+.btn-premium-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 11px 23px;
+  background: transparent;
+  color: #a5b4fc !important;
+  border: 1px solid rgba(99,102,241,0.4);
+  border-radius: 12px;
+  font-weight: 600;
+  text-decoration: none !important;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  width: 100%;
+  font-size: 0.85rem;
+}
+.btn-premium-outline:hover {
+  background: rgba(99,102,241,0.1);
+  border-color: rgba(99,102,241,0.8);
+}
+
+.stat-box {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: 1.2rem;
+  text-align: center;
+}
+.stat-box .label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+.stat-box .value { color: #f8fafc; font-size: 1.4rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; }
 
 .panel-card {
-  background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.06));
-  border: 1px solid rgba(99,102,241,0.2);
-  border-radius: 20px;
-  padding: 2rem;
+  background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 2.2rem;
   text-align: center;
-  transition: all 0.25s ease;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   cursor: pointer;
-  height: 260px;
+  height: 280px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   align-items: center;
+  position: relative;
+  overflow: hidden;
 }
 .panel-card:hover {
-  border-color: rgba(99,102,241,0.5);
-  transform: translateY(-3px);
-  box-shadow: 0 12px 40px rgba(99,102,241,0.2);
+  border-color: rgba(99,102,241,0.4);
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  background: rgba(255,255,255,0.06);
 }
-.panel-card .icon {
-  font-size: 2.8rem;
-  display: block;
-  margin-bottom: 1rem;
+.panel-card::after {
+  content: "";
+  position: absolute;
+  top: -50%; left: -50%; width: 200%; height: 200%;
+  background: radial-gradient(circle, rgba(99,102,241,0.1) 0%, transparent 70%);
+  opacity: 0; transition: opacity 0.3s;
 }
-.panel-card h3 {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: #e2e8f0;
-  margin: 0 0 0.5rem;
-}
-.panel-card p {
-  color: #64748b;
-  font-size: 0.88rem;
-  margin: 0;
-}
+.panel-card:hover::after { opacity: 1; }
 
 /* ══════════════════════════════════════════
    SECTION HEADERS
@@ -499,6 +588,10 @@ if "user" not in st.session_state:
     st.session_state.user = _qp.get("user", None)
 if "admin" not in st.session_state:
     st.session_state.admin = _qp.get("admin", None)
+if "force_poll_id" not in st.session_state:
+    st.session_state.force_poll_id = _qp.get("poll_id", None)
+if "view_poll_result_id" not in st.session_state:
+    st.session_state.view_poll_result_id = _qp.get("res_id", None)
 
 # Remaining session defaults (OTP flow state)
 for k, v in [("login_otp_sent", False), ("login_otp_verified", False), ("login_username", "")]:
@@ -535,8 +628,8 @@ def get_voter_ip():
     except Exception:
         return "unknown"
 
-def send_results_email_blast(winner, vote_counts, total):
-    """Send election results email to all registered voters."""
+def send_results_email_blast(poll_name, winner, vote_counts, total):
+    """Send an automated blast email with election results to all users."""
     try:
         import sendgrid
         from sendgrid.helpers.mail import Mail
@@ -587,23 +680,25 @@ def send_results_email_blast(winner, vote_counts, total):
         print(f"[BLAST ERROR] {e}")
         return 0
 
-def check_and_announce_winner():
-    """Check if election has ended and announce results if not done yet."""
-    end_time = get_election_end_time()
-    if not end_time:
-        return None
-    now = datetime.now(timezone.utc)
-    if hasattr(end_time, 'tzinfo') and end_time.tzinfo is None:
-        end_time = end_time.replace(tzinfo=timezone.utc)
-    if now >= end_time and not get_winner_announced():
-        vote_counts = get_vote_counts()
+def check_and_announce_poll_winners():
+    """Check if any specific polls have ended and announce results if not done yet."""
+    ended = get_ended_unannounced_polls()
+    announced_any = False
+    for p in ended:
+        poll_id = p["poll_id"]
+        poll_name = p["name"]
+        
+        vote_counts = get_poll_vote_counts(poll_id)
         if vote_counts:
             winner = max(vote_counts, key=vote_counts.get)
-            total = sum(vote_counts.values())
-            set_winner_announced(True)
-            send_results_email_blast(winner, vote_counts, total)
-            return winner
-    return None
+            total = total_poll_votes(poll_id)
+            mark_poll_results_announced(poll_id)
+            send_results_email_blast(poll_name, winner, vote_counts, total)
+            announced_any = True
+        else:
+            # If no votes were cast but election ended, we still mark it announced to prevent loop
+            mark_poll_results_announced(poll_id)
+    return announced_any
 
 
 def generate_symbol_image(symbol_name):
@@ -877,7 +972,7 @@ if st.session_state.page != "home":
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
 # Auto-check winner announcement on every page load
-check_and_announce_winner()
+check_and_announce_poll_winners()
 
 # ═══════════════════════════════════════════════════════════
 # PAGE: HOME
@@ -1214,88 +1309,133 @@ if st.session_state.page == "user_login":
 # ═══════════════════════════════════════════════════════════
 if st.session_state.page == "vote":
 
-    user     = st.session_state.user
-    user_doc = get_user(user)
-    vid      = user_doc["vote_id"] if user_doc else None
-    voter    = get_valid_voter(vid) if vid else None
-    cands    = get_candidates()
+    _user_v   = st.session_state.user
+    _udoc     = get_user(_user_v)
+    _vid      = _udoc["vote_id"] if _udoc else None
+    _full_name = _udoc.get("name", _user_v) if _udoc else _user_v
+    
+    _force_pid = st.session_state.get("force_poll_id")
+    _active = get_poll(_force_pid) if _force_pid else get_active_poll()
 
-    st.markdown(f'<div class="section-title">Welcome, {user} 👋</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="section-sub">Voter ID: <span style="color:#a5b4fc;font-weight:600">{vid}</span></div>', unsafe_allow_html=True)
+    # Back navigation at top
+    if st.button("← Back to Voter Dashboard", key="ballot_top_back"):
+        goto("voter_dashboard")
 
-    if voter and voter["voted"]:
-        st.markdown("""
-        <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);
-             border-radius:16px;padding:2rem;text-align:center;margin:1rem 0;">
-            <div style="font-size:3rem;margin-bottom:0.5rem;">✅</div>
-            <div style="font-size:1.2rem;font-weight:700;color:#6ee7b7;">Vote Already Cast</div>
-            <div style="color:#64748b;margin-top:0.4rem;font-size:0.9rem;">
-                Your vote has been securely recorded in the blockchain. Thank you for participating.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title">Welcome, {_full_name} 👋</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-sub">Voter ID: <span style="color:#a5b4fc;font-weight:600">{_vid}</span></div>', unsafe_allow_html=True)
 
-    else:
-        if not cands:
-            st.warning("⚠️ No candidates have been added yet. Contact the admin.")
+    if _active:
+        _pid   = _active["poll_id"]
+        _pcands = get_poll_candidates(_pid)
+        _already = has_voted_in_poll(_pid, _vid) if _vid else False
+
+        _start = _active.get("start_time")
+        _end   = _active.get("end_time")
+        _start_str = _start.strftime('%d %b %Y, %H:%M') if hasattr(_start, 'strftime') else str(_start)
+        _end_str   = _end.strftime('%d %b %Y, %H:%M') if hasattr(_end, 'strftime') else str(_end)
+        
+        import datetime
+        now = datetime.datetime.utcnow()
+        if hasattr(_end, 'timestamp'):
+            rem = _end - now
+            if rem.total_seconds() > 0:
+                hrs, rem_sec = divmod(rem.total_seconds(), 3600)
+                mins, _ = divmod(rem_sec, 60)
+                rem_str = f"{int(hrs)}h {int(mins)}m remaining"
+            else:
+                rem_str = "Poll Ended"
         else:
-            st.markdown('<div class="section-sub">Select your candidate and submit your vote.</div>', unsafe_allow_html=True)
+            rem_str = "N/A"
 
-            # Show candidate info cards
-            st.markdown("**Candidates:**")
-            for c in cands:
-                st.markdown(f"""
-                <div class="cand-card">
-                    <span class="cand-symbol">{c.get('symbol','🗳️')}</span>
-                    <div class="cand-info">
-                        <h4>{c['name']}</h4>
-                        <p>{c.get('party','Independent')}</p>
-                    </div>
+        _tot_votes = total_poll_votes(_pid)
+
+        st.markdown(f"""
+        <div style="background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(139,92,246,0.05));
+             border:1px solid rgba(99,102,241,0.2);border-radius:20px;padding:2rem;margin:1rem auto;max-width:800px;box-shadow:0 10px 30px rgba(0,0,0,0.2);">
+          <div style="text-align:center;margin-bottom:1.5rem;">
+            <div style="font-size:0.8rem;color:#6366f1;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:8px;">🟢 Active Election Ballot</div>
+            <div style="font-size:2rem;font-weight:800;color:#e2e8f0;margin-bottom:10px;">{_active["name"]}</div>
+            <div style="color:#94a3b8;font-size:0.95rem;line-height:1.6;max-width:600px;margin:0 auto 20px auto;">{_active.get("description","No description provided.")}</div>
+          </div>
+          
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;background:rgba(255,255,255,0.03);padding:24px;border-radius:16px;border:1px solid rgba(255,255,255,0.06);">
+              <div style="text-align:center;padding:10px;border-right:1px solid rgba(255,255,255,0.05);">
+                <div style="color:#64748b;font-size:0.7rem;text-transform:uppercase;margin-bottom:6px;letter-spacing:0.05em;">⏱️ Start Time</div>
+                <div style="color:#cbd5e1;font-size:0.9rem;font-weight:600;">{_start_str}</div>
+              </div>
+              <div style="text-align:center;padding:10px;">
+                <div style="color:#64748b;font-size:0.7rem;text-transform:uppercase;margin-bottom:6px;letter-spacing:0.05em;">🏁 End Time</div>
+                <div style="color:#cbd5e1;font-size:0.9rem;font-weight:600;">{_end_str}</div>
+              </div>
+              <div style="text-align:center;padding:10px;border-right:1px solid rgba(255,255,255,0.05);border-top:1px solid rgba(255,255,255,0.05);">
+                <div style="color:#64748b;font-size:0.7rem;text-transform:uppercase;margin-bottom:6px;letter-spacing:0.05em;">📊 Participation</div>
+                <div style="color:#10b981;font-size:1.1rem;font-weight:700;">{_tot_votes} Votes</div>
+              </div>
+              <div style="text-align:center;padding:10px;border-top:1px solid rgba(255,255,255,0.05);">
+                <div style="color:#64748b;font-size:0.7rem;text-transform:uppercase;margin-bottom:6px;letter-spacing:0.05em;">⏳ Time Left</div>
+                <div style="color:#f43f5e;font-size:1.1rem;font-weight:700;">{rem_str}</div>
+              </div>
+          </div>
+        </div>""", unsafe_allow_html=True)
+
+        if _already:
+            vote_rec = get_poll_vote_record(_pid, _vid)
+            c_voted = vote_rec.get("candidate", "—") if vote_rec else "—"
+            v_time = vote_rec.get("timestamp") if vote_rec else None
+            t_str = v_time.strftime("%d %b %Y, %H:%M:%S") if hasattr(v_time, "strftime") else str(v_time)
+            r_str = get_receipt(_vid, _pid) or "No receipt found."
+
+            st.markdown("""
+            <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);
+                 border-radius:16px;padding:2rem;text-align:center;margin:1rem 0;">
+                <div style="font-size:3rem;margin-bottom:0.5rem;">✅</div>
+                <div style="font-size:1.2rem;font-weight:700;color:#6ee7b7;">Vote Already Cast in this Election</div>
+                <div style="color:#64748b;margin-top:0.4rem;font-size:0.9rem;">
+                    Your vote has been securely recorded. Thank you for participating.
                 </div>
-                """, unsafe_allow_html=True)
+            </div>""", unsafe_allow_html=True)
+            
+            receip_content = f"QuVote Official Election Receipt\n--------------------------------\nElection : {_active['name']}\nVoter ID : {_vid}\nCandidate: {c_voted}\nTime Cast: {t_str}\nHash     : {r_str}\n\nKeep this receipt as cryptographic proof of your vote."
+            st.download_button("⬇️ Download Vote Receipt", data=receip_content, file_name=f"QuVote_Receipt_{_pid}.txt", mime="text/plain", use_container_width=True)
 
-            st.markdown("<br>", unsafe_allow_html=True)
-            choice = st.radio(
-                "Cast your vote:",
-                [c["name"] for c in cands],
-                key="vote_choice"
-            )
+        elif not _pcands:
+            st.warning("⚠️ No candidates have been added to this election yet. Contact the admin.")
+        else:
+            st.markdown("**Select your candidate:**")
+            for _pc in _pcands:
+                _ib = _pc.get("symbol_image_b64", "")
+                if _ib:
+                    _card_img = f"<img src='data:image/png;base64,{_ib}' width='64' height='64' style='border-radius:10px;object-fit:cover;'>"
+                else:
+                    _card_img = f"<span style='font-size:2.8rem;'>{_pc.get('symbol','🗳️')}</span>"
+                st.markdown(f"""
+                <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+                     border-radius:14px;padding:1rem 1.2rem;display:flex;align-items:center;
+                     gap:16px;margin:6px 0;transition:all 0.2s;">
+                  {_card_img}
+                  <div>
+                    <div style="font-weight:700;color:#e2e8f0;font-size:1rem;">{_pc["name"]}</div>
+                    <div style="color:#94a3b8;font-size:0.82rem;">{_pc.get("party","Independent")}</div>
+                    <div style="color:#64748b;font-size:0.75rem;">Symbol: {_pc.get("symbol","")}</div>
+                  </div>
+                </div>""", unsafe_allow_html=True)
 
-            if st.button("🗳️ Submit Vote", key="vote_submit"):
-                save_vote(vid, choice)
-                mark_voted(vid)
-                # Generate and save receipt
-                receipt = generate_receipt(vid, choice)
-                save_receipt(vid, receipt)
-                # Log IP for suspicious activity tracking
-                voter_ip = get_voter_ip()
-                log_activity(vid, voter_ip, "vote")
-                st.session_state["last_receipt"] = receipt
-                st.session_state["last_choice"] = choice
+            _choice_p = st.radio("Cast your vote for:", [c["name"] for c in _pcands], key="poll_vote_radio")
+            if st.button("🗳️ Submit Vote", key="submit_poll_vote"):
+                save_poll_vote(_pid, _vid, _choice_p)
+                mark_voted(_vid)
+                _rct = generate_receipt(_vid, _choice_p)
+                save_receipt(_vid, _pid, _rct)
+                log_activity(_vid, get_voter_ip(), "vote")
+                st.session_state["last_receipt"] = _rct
+                st.session_state["last_choice"]  = _choice_p
+                st.success(f"✅ Vote submitted for **{_choice_p}**!")
                 st.rerun()
 
-    # Show receipt if just voted
-    if st.session_state.get("last_receipt"):
-        receipt = st.session_state["last_receipt"]
-        choice_done = st.session_state.get("last_choice", "")
-        st.markdown(f"""
-        <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.3);
-             border-radius:16px;padding:1.5rem;margin:1rem 0;">
-            <div style="text-align:center;margin-bottom:1rem;">
-                <div style="font-size:2rem;">🧾</div>
-                <div style="font-weight:700;color:#a5b4fc;font-size:1.1rem;">Your Vote Receipt</div>
-                <div style="color:#64748b;font-size:0.82rem;margin-top:4px;">Keep this for your records. It proves your vote was recorded.</div>
-            </div>
-            <div style="background:#0f172a;border-radius:8px;padding:1rem;font-family:monospace;
-                 font-size:0.75rem;color:#6ee7b7;word-break:break-all;text-align:center;">{receipt}</div>
-            <div style="text-align:center;margin-top:0.8rem;color:#64748b;font-size:0.82rem;">
-                ✅ Vote cast for: <strong style="color:#a5b4fc;">{choice_done}</strong>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
+    else:
+        st.info("⏳ No active election available right now.")
+        
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("📩 Submit a Query", key="query_btn"):
@@ -1307,6 +1447,7 @@ if st.session_state.page == "vote":
         if st.button("🚪 Logout", key="logout_user"):
             st.session_state.clear()
             goto("home")
+
 
 # ═══════════════════════════════════════════════════════════
 # PAGE: QUERY / CONTACT
@@ -1439,119 +1580,188 @@ if st.session_state.page == "dashboard":
         "📊 Results", "🏛️ Candidates", "📋 Voter Roll", "💬 Queries", "👥 Users", "✅ Pending Users", "🗳️ Polls"
     ])
 
-    # ── TAB 1: RESULTS ────────────────────────────────────
+    # ── TAB 1: RESULTS ──────────────────────────────────────
     with t1:
+        import datetime as _dt_r
+        all_polls_r = get_all_polls()
+
+        # — Poll-based results (grouped by poll) ————————————
+        if all_polls_r:
+            st.markdown("### 🗳️ Election Poll Results")
+            for _pr in all_polls_r:
+                _prid   = _pr["poll_id"]
+                _prname = _pr["name"]
+                _pr_total = total_poll_votes(_prid)
+                _pr_votes = get_poll_vote_counts(_prid)
+                _pr_cands = get_poll_candidates(_prid)
+                _now_r = _dt_r.datetime.now()
+                _status_r = ("🟢 Active"    if _pr["start_time"] <= _now_r <= _pr["end_time"]
+                             else ("🔜 Upcoming" if _now_r < _pr["start_time"] else "🔴 Ended"))
+
+                st.markdown(f"""
+                <div style='background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.25);
+                     border-radius:14px;padding:1rem 1.2rem;margin:0.8rem 0;'>
+                  <div style='display:flex;justify-content:space-between;align-items:center;'>
+                    <div>
+                      <span style='font-size:1rem;font-weight:700;color:#a5b4fc;'>{_prname}</span>
+                      &nbsp;<span style='font-size:0.75rem;color:#64748b;'>{_status_r}</span>
+                    </div>
+                    <span style='font-size:0.82rem;color:#64748b;'>{_pr_total} votes</span>
+                  </div>
+                </div>""", unsafe_allow_html=True)
+
+                if not _pr_cands:
+                    st.caption("No candidates in this poll.")
+                elif _pr_total == 0:
+                    st.caption("No votes cast yet in this poll.")
+                    for _prc in _pr_cands:
+                        st.markdown(f"""
+                        <div class='result-row'>
+                          <span style='font-weight:600;color:#e2e8f0;'>{_prc['name']}</span>
+                          <span style='color:#64748b;'>0 votes</span>
+                        </div>""", unsafe_allow_html=True)
+                else:
+                    _pr_max = max(_pr_votes.values()) if _pr_votes else 0
+                    for _prc in sorted(_pr_cands, key=lambda x: _pr_votes.get(x["name"],0), reverse=True):
+                        _prc_cnt = _pr_votes.get(_prc["name"], 0)
+                        _prc_pct = round(_prc_cnt / _pr_total * 100, 1) if _pr_total else 0
+                        _is_lead = _prc_cnt == _pr_max and _pr_max > 0
+                        _pill_l  = '<span class="pill pill-green">Leading</span>' if _is_lead else ''
+                        _img_b   = _prc.get("symbol_image_b64","")
+                        _thumb   = (f"<img src='data:image/png;base64,{_img_b}' width='32' height='32' "
+                                    f"style='border-radius:6px;margin-right:10px;vertical-align:middle;'>" if _img_b
+                                    else f"<span style='font-size:1.4rem;margin-right:10px;'>{_prc.get('symbol','🗳️')}</span>")
+                        st.markdown(f"""
+                        <div class='result-row' style='margin:4px 0;'>
+                          <div style='display:flex;align-items:center;'>
+                            {_thumb}
+                            <span style='font-weight:600;color:#e2e8f0;'>{_prc["name"]}</span>
+                            &nbsp;{_pill_l}
+                          </div>
+                          <div style='font-family:\'Space Grotesk\',sans-serif;font-size:1.1rem;
+                               font-weight:700;color:#a5b4fc;'>{_prc_cnt}</div>
+                        </div>
+                        <div class='result-bar-wrap'>
+                          <div class='result-bar' style='width:{_prc_pct}%;'></div>
+                        </div>""", unsafe_allow_html=True)
+                    # Poll pie chart
+                    if go and _pr_total > 0:
+                        _pc_labels = [c["name"] for c in _pr_cands]
+                        _pc_values = [_pr_votes.get(c["name"],0) for c in _pr_cands]
+                        _clrs_r    = ["#6366f1","#06b6d4","#10b981","#f59e0b","#f43f5e"]
+                        _fig_r = go.Figure(go.Pie(
+                            labels=_pc_labels, values=_pc_values, hole=0.45,
+                            marker=dict(colors=_clrs_r[:len(_pc_labels)],
+                                        line=dict(color='#0f172a',width=3)),
+                            textinfo="label+percent",
+                            textfont=dict(color="#e2e8f0",size=13),
+                        ))
+                        _fig_r.update_layout(
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            font=dict(color="#e2e8f0",family="Inter"),
+                            margin=dict(t=20,b=20,l=20,r=20), showlegend=True,
+                            legend=dict(font=dict(color="#94a3b8",size=11),bgcolor="rgba(0,0,0,0)"),
+                            annotations=[dict(text=f"<b>{_pr_total}</b><br>votes",
+                                             font=dict(size=14,color="#a5b4fc"),showarrow=False)]
+                        )
+                        st.plotly_chart(_fig_r, use_container_width=True, key=f"pie_{_prid}")
+            st.markdown("---")
+
+        # — Legacy global results ———————————————————
         votes  = get_vote_counts()
         cands  = get_candidate_names()
-
-        if not cands:
-            st.info("No candidates added yet.")
-        elif vt == 0:
-            st.info("No votes cast yet.")
-        else:
-            # Build full result dict (0 for candidates with no votes)
-            result = {c: votes.get(c, 0) for c in cands}
-            max_v  = max(result.values()) if result else 0
-
-            st.markdown("**Live Vote Count:**")
-            for cand, count in sorted(result.items(), key=lambda x: x[1], reverse=True):
-                pct_bar = (count / vt * 100) if vt > 0 else 0
-                is_lead = count == max_v and max_v > 0
-                pill = '<span class="pill pill-green">Leading</span>' if is_lead else ''
-                st.markdown(f"""
-                <div class="result-row">
-                    <div>
-                        <span style="font-weight:700;color:#e2e8f0">{cand}</span>
-                        &nbsp; {pill}
-                    </div>
-                    <div style="font-family:'Space Grotesk',sans-serif;font-size:1.2rem;font-weight:700;color:#a5b4fc">
-                        {count}
-                    </div>
-                </div>
-                <div class="result-bar-wrap">
-                    <div class="result-bar" style="width:{pct_bar:.1f}%"></div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            # Winner/Tie
-            winners = [k for k, v in result.items() if v == max_v and max_v > 0]
-            if len(winners) == 1:
-                st.success(f"🏆 **Winner: {winners[0]}** with {max_v} votes ({max_v/vt*100:.1f}%)")
-            elif len(winners) > 1:
-                st.warning(f"🤝 **Tie** between: {', '.join(winners)}")
-
-            # Pie Chart
-            if go:
-                cands_p = list(result.keys())
-                counts_p = list(result.values())
-                cols_p = ["#6366f1","#06b6d4","#10b981","#f59e0b","#f43f5e"]
-                fig_dash = go.Figure(go.Pie(
-                    labels=cands_p, values=counts_p, hole=0.45,
-                    marker=dict(colors=cols_p[:len(cands_p)],
-                                line=dict(color='#0f172a', width=3)),
-                    textinfo="label+percent",
-                    textfont=dict(color="#e2e8f0", size=14),
-                    hovertemplate="<b>%{label}</b><br>Votes: %{value}<br>Share: %{percent}<extra></extra>",
-                ))
-                fig_dash.update_layout(
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    font=dict(color="#e2e8f0", family="Inter"),
-                    margin=dict(t=20,b=20,l=20,r=20),
-                    showlegend=True,
-                    legend=dict(font=dict(color="#94a3b8", size=12),
-                                bgcolor="rgba(0,0,0,0)"),
-                    annotations=[dict(
-                        text=f"<b>{vt}</b><br>votes",
-                        font=dict(size=16, color="#a5b4fc"), showarrow=False
-                    )]
-                )
-                st.plotly_chart(fig_dash, use_container_width=True)
-            else:
-                st.bar_chart(result)
-
-    # ── TAB 2: CANDIDATE MANAGER ──────────────────────────
-    with t2:
-        st.markdown("**Add Candidate**")
-        ca, cb, cc_ = st.columns([3,3,2])
-        with ca:
-            c_name   = st.text_input("Candidate Name", key="c_name", placeholder="Full name")
-        with cb:
-            c_party  = st.text_input("Party / Alliance", key="c_party", placeholder="Party name")
-        with cc_:
-            c_symbol = st.text_input("Symbol (emoji)", key="c_symbol", placeholder="e.g. 🌸")
-
-        if st.button("➕ Add Candidate", key="add_cand"):
-            if not c_name.strip():
-                st.error("Candidate name is required.")
-            else:
-                if add_candidate(c_name.strip(), c_party.strip() or "Independent", c_symbol.strip() or "🗳️"):
-                    st.success(f"✅ {c_name} added.")
-                    st.rerun()
-                else:
-                    st.error("Candidate already exists.")
-
-        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-        st.markdown("**Current Candidates**")
-        cands = get_candidates()
-        if not cands:
-            st.info("No candidates added yet.")
-        else:
-            for c in cands:
-                r1, r2 = st.columns([5, 1])
-                with r1:
+        if cands and vt > 0:
+            with st.expander("📊 Legacy Global Votes", expanded=not all_polls_r):
+                result = {c: votes.get(c, 0) for c in cands}
+                max_v  = max(result.values()) if result else 0
+                for cand, count in sorted(result.items(), key=lambda x: x[1], reverse=True):
+                    pct_bar = (count / vt * 100) if vt > 0 else 0
+                    is_lead = count == max_v and max_v > 0
+                    pill = '<span class="pill pill-green">Leading</span>' if is_lead else ''
                     st.markdown(f"""
-                    <div class="cand-card" style="margin:4px 0">
-                        <span class="cand-symbol">{c.get('symbol','🗳️')}</span>
-                        <div class="cand-info">
-                            <h4>{c['name']}</h4>
-                            <p>{c.get('party','Independent')}</p>
-                        </div>
+                    <div class="result-row">
+                        <div><span style="font-weight:700;color:#e2e8f0">{cand}</span>&nbsp;{pill}</div>
+                        <div style="font-family:'Space Grotesk',sans-serif;font-size:1.1rem;
+                             font-weight:700;color:#a5b4fc">{count}</div>
                     </div>
-                    """, unsafe_allow_html=True)
-                with r2:
-                    if st.button("🗑️", key=f"del_cand_{c['name']}"):
-                        remove_candidate(c["name"])
+                    <div class="result-bar-wrap">
+                        <div class="result-bar" style="width:{pct_bar:.1f}%"></div>
+                    </div>""", unsafe_allow_html=True)
+                winners = [k for k,v in result.items() if v==max_v and max_v>0]
+                if len(winners)==1:
+                    st.success(f"🏆 **{winners[0]}** leads with {max_v} votes")
+                elif len(winners)>1:
+                    st.warning(f"🤝 Tie: {', '.join(winners)}")
+        elif not all_polls_r:
+            st.info("No votes or candidates yet.")
+    # ── TAB 2: CANDIDATE MANAGER ────────────────────────────
+    with t2:
+        # — Poll candidates grouped by poll ——————————————
+        all_polls_c = get_all_polls()
+        if all_polls_c:
+            st.markdown("### 🗳️ Poll Candidates (grouped by election)")
+            for _pc_poll in all_polls_c:
+                _pc_pid   = _pc_poll["poll_id"]
+                _pc_pname = _pc_poll["name"]
+                _pc_cands = get_poll_candidates(_pc_pid)
+                with st.expander(f"🏛️ {_pc_pname}  —  {len(_pc_cands)} candidate(s)", expanded=True):
+                    if not _pc_cands:
+                        st.caption("No candidates added to this poll yet. Use the Polls tab to add them.")
+                    else:
+                        for _pcc in _pc_cands:
+                            _pcc_img  = _pcc.get("symbol_image_b64","")
+                            _pcc_thumb = (f"<img src='data:image/png;base64,{_pcc_img}' width='48' height='48' "
+                                          f"style='border-radius:8px;object-fit:cover;'>" if _pcc_img
+                                          else f"<span style='font-size:2.2rem;'>{_pcc.get('symbol','🗳️')}</span>")
+                            st.markdown(f"""
+                            <div class='cand-card' style='margin:4px 0;'>
+                              {_pcc_thumb}
+                              <div class='cand-info'>
+                                <h4>{_pcc['name']}</h4>
+                                <p>{_pcc.get('party','Independent')} &bull; Symbol: {_pcc.get('symbol','')}</p>
+                              </div>
+                            </div>""", unsafe_allow_html=True)
+            st.markdown("---")
+
+        # — Legacy global candidates ——————————————————
+        with st.expander("📋 Legacy Global Candidates (old system)", expanded=not all_polls_c):
+            ca, cb, cc_ = st.columns([3,3,2])
+            with ca:
+                c_name   = st.text_input("Candidate Name", key="c_name", placeholder="Full name")
+            with cb:
+                c_party  = st.text_input("Party / Alliance", key="c_party", placeholder="Party name")
+            with cc_:
+                c_symbol = st.text_input("Symbol (emoji)", key="c_symbol", placeholder="e.g. 🌸")
+            if st.button("➕ Add Legacy Candidate", key="add_cand"):
+                if not c_name.strip():
+                    st.error("Candidate name is required.")
+                else:
+                    if add_candidate(c_name.strip(), c_party.strip() or "Independent", c_symbol.strip() or "🗳️"):
+                        st.success(f"✅ {c_name} added.")
                         st.rerun()
+                    else:
+                        st.error("Candidate already exists.")
+            st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+            cands_leg = get_candidates()
+            if not cands_leg:
+                st.info("No legacy candidates added.")
+            else:
+                for c in cands_leg:
+                    r1, r2 = st.columns([5, 1])
+                    with r1:
+                        st.markdown(f"""
+                        <div class="cand-card" style="margin:4px 0">
+                            <span class="cand-symbol">{c.get('symbol','🗳️')}</span>
+                            <div class="cand-info">
+                                <h4>{c['name']}</h4>
+                                <p>{c.get('party','Independent')}</p>
+                            </div>
+                        </div>""", unsafe_allow_html=True)
+                    with r2:
+                        if st.button("🗑️", key=f"del_cand_{c['name']}"):
+                            remove_candidate(c["name"])
+                            st.rerun()
+
 
     # ── TAB 3: VOTER ROLL ─────────────────────────────────
     with t3:
@@ -1751,12 +1961,12 @@ if st.session_state.page == "dashboard":
             with col_sd:
                 p_start_date = st.date_input("Start Date", key="p_start_date")
             with col_sti:
-                p_start_ti = st.time_input("Start Time (UTC)", key="p_start_time")
+                p_start_ti = st.time_input("Start Time", key="p_start_time")
             col_ed, col_eti = st.columns(2)
             with col_ed:
                 p_end_date = st.date_input("End Date", key="p_end_date")
             with col_eti:
-                p_end_ti = st.time_input("End Time (UTC)", key="p_end_time")
+                p_end_ti = st.time_input("End Time", key="p_end_time")
             poll_submitted = st.form_submit_button("🚀 Create Poll & Notify All Voters")
         if poll_submitted:
             if not poll_name_f.strip():
@@ -1773,111 +1983,107 @@ if st.session_state.page == "dashboard":
                         sc = send_poll_announcement_email(poll_name_f.strip(), poll_desc_f.strip(), p_start, p_end)
                         mark_poll_email_sent(new_pid)
                     st.success(f"Poll **{poll_name_f}** created! ID:`{new_pid}` — 📧 {sc} voters notified.")
+                    st.rerun()
 
         st.markdown("---")
-        st.markdown("### 🏛️ Manage Candidates Per Poll")
+        st.markdown("### 🏛️ Manage Existing Polls")
         all_polls_list = get_all_polls()
         if not all_polls_list:
             st.info("No polls yet. Create one above!")
         else:
-            poll_opts = {p["poll_id"]: f"{p['name']} [{p['poll_id']}]" for p in all_polls_list}
-            sel_pid = st.selectbox("Select Poll", list(poll_opts.keys()),
-                                   format_func=lambda x: poll_opts[x], key="admin_sel_poll")
-            sel_p = get_poll(sel_pid)
-            if sel_p:
-                now_u = dt_mod2.datetime.utcnow()
-                status_lbl = ("🟢 Active"    if sel_p["start_time"] <= now_u <= sel_p["end_time"]
-                              else ("🔜 Upcoming" if now_u < sel_p["start_time"] else "🔴 Ended"))
-                st.markdown(
-                    f"<div style='background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);"
-                    f"border-radius:10px;padding:0.8rem;'><b style='color:#a5b4fc;'>{sel_p['name']}</b>"
-                    f" &nbsp;<span style='color:#64748b;font-size:0.8rem;'>{status_lbl}</span><br>"
-                    f"<span style='color:#64748b;font-size:0.78rem;'>{sel_p['start_time']} → {sel_p['end_time']}</span></div>",
-                    unsafe_allow_html=True)
+            for p in all_polls_list:
+                sel_pid = p["poll_id"]
+                now_u = dt_mod2.datetime.now()
+                status_lbl = ("🟢 Active"    if p["start_time"] <= now_u <= p["end_time"]
+                              else ("🔜 Upcoming" if now_u < p["start_time"] else "🔴 Ended"))
+                
+                expander_label = f"🗳️ {p['name']}  —  {status_lbl}"
+                with st.expander(expander_label):
+                    st.markdown(
+                        f"**ID:** `{sel_pid}` | **Window:** {p['start_time']} → {p['end_time']}<br>"
+                        f"_{p.get('description', 'No description')}_", 
+                        unsafe_allow_html=True
+                    )
+                    st.markdown("---")
+                    
+                    # Cand list
+                    pcands = get_poll_candidates(sel_pid)
+                    if pcands:
+                        st.markdown(f"**Candidates ({len(pcands)}):**")
+                        for pc in pcands:
+                            pca, pcb = st.columns([5, 1])
+                            with pca:
+                                ib = pc.get("symbol_image_b64","")
+                                img_tag = (f"<img src='data:image/png;base64,{ib}' width='44' height='44' "
+                                           f"style='border-radius:6px;margin-right:10px;vertical-align:middle;'>"
+                                           if ib else "<span style='font-size:1.8rem;margin-right:10px;'>🗳️</span>")
+                                st.markdown(f"<div style='display:flex;align-items:center;background:rgba(255,255,255,0.03);"
+                                            f"border-radius:8px;padding:0.5rem;margin:2px 0;'>"
+                                            f"{img_tag}<div><b style='color:#e2e8f0;'>{pc['name']}</b><br>"
+                                            f"<span style='color:#94a3b8;font-size:0.78rem;'>{pc.get('party','Independent')} • {pc.get('symbol','')}</span></div></div>",
+                                            unsafe_allow_html=True)
+                            with pcb:
+                                if st.button("❌", key=f"rpc_{sel_pid}_{pc['name']}"):
+                                    remove_poll_candidate(sel_pid, pc["name"])
+                                    st.rerun()
+                    else:
+                        st.info("No candidates added to this poll yet.")
 
-                pcands = get_poll_candidates(sel_pid)
-                if pcands:
-                    st.markdown(f"**Candidates ({len(pcands)}):**")
-                    for pc in pcands:
-                        pca, pcb = st.columns([5, 1])
-                        with pca:
-                            ib = pc.get("symbol_image_b64","")
-                            img_tag = (f"<img src='data:image/png;base64,{ib}' width='44' height='44' "
-                                       f"style='border-radius:6px;margin-right:10px;vertical-align:middle;'>"
-                                       if ib else "<span style='font-size:1.8rem;margin-right:10px;'>🗳️</span>")
-                            st.markdown(f"<div style='display:flex;align-items:center;background:rgba(255,255,255,0.03);"
-                                        f"border-radius:8px;padding:0.5rem;margin:2px 0;'>"
-                                        f"{img_tag}<div><b style='color:#e2e8f0;'>{pc['name']}</b><br>"
-                                        f"<span style='color:#94a3b8;font-size:0.78rem;'>{pc.get('party','Independent')} • {pc.get('symbol','')}</span></div></div>",
-                                        unsafe_allow_html=True)
-                        with pcb:
-                            if st.button("❌", key=f"rpc_{sel_pid}_{pc['name']}"):
-                                remove_poll_candidate(sel_pid, pc["name"])
-                                st.rerun()
-                else:
-                    st.info("No candidates yet.")
+                    # Add Candidate
+                    st.markdown("<br>**➕ Add Candidate to this Poll:**", unsafe_allow_html=True)
+                    ia, ib2, ic = st.columns(3)
+                    with ia:
+                        nc_name  = st.text_input("Name", key=f"pc_nm_{sel_pid}")
+                    with ib2:
+                        nc_party = st.text_input("Party", key=f"pc_pty_{sel_pid}")
+                    with ic:
+                        nc_sym   = st.text_input("Symbol (describe)", key=f"pc_sym_{sel_pid}", placeholder="lotus, hand, sun...")
 
-                st.markdown("**➕ Add Candidate:**")
-                ia, ib2, ic = st.columns(3)
-                with ia:
-                    nc_name  = st.text_input("Name", key="pc_nm")
-                with ib2:
-                    nc_party = st.text_input("Party", key="pc_pty")
-                with ic:
-                    nc_sym   = st.text_input("Symbol (describe)", key="pc_sym", placeholder="lotus, hand, sun...")
-
-                g1, g2 = st.columns(2)
-                with g1:
-                    if st.button("🎨 Generate Image", key="gen_sym_img"):
-                        if nc_sym.strip():
-                            with st.spinner(f"AI generating image for '{nc_sym}' (~10s)..."):
-                                gimg = generate_symbol_image(nc_sym.strip())
-                            if gimg:
-                                st.session_state["prev_img"] = gimg
-                                st.session_state["prev_sym"] = nc_sym.strip()
-                                st.success("✅ Image generated! Preview below.")
+                    g1, g2 = st.columns(2)
+                    with g1:
+                        if st.button("🎨 Generate Image", key=f"gen_sym_{sel_pid}"):
+                            if nc_sym.strip():
+                                with st.spinner(f"AI generating image for '{nc_sym}' (~10s)..."):
+                                    gimg = generate_symbol_image(nc_sym.strip())
+                                if gimg:
+                                    st.session_state[f"prev_img_{sel_pid}"] = gimg
+                                    st.session_state[f"prev_sym_{sel_pid}"] = nc_sym.strip()
+                                    st.success("✅ Image generated! Preview below.")
+                                else:
+                                    st.error("Generation failed. Check internet.")
                             else:
-                                st.error("Generation failed. Check internet.")
-                        else:
-                            st.warning("Enter symbol description first.")
+                                st.warning("Enter symbol description first.")
 
-                if st.session_state.get("prev_img"):
-                    st.image(f"data:image/png;base64,{st.session_state['prev_img']}",
-                             caption=f"Symbol: {st.session_state.get('prev_sym','')}",
-                             width=130)
+                    img_key = f"prev_img_{sel_pid}"
+                    sym_key = f"prev_sym_{sel_pid}"
+                    if st.session_state.get(img_key):
+                        st.image(f"data:image/png;base64,{st.session_state[img_key]}",
+                                 caption=f"Symbol: {st.session_state.get(sym_key,'')}",
+                                 width=130)
 
-                with g2:
-                    if st.button("➕ Add Candidate", key="apc_btn"):
-                        if not nc_name.strip():
-                            st.error("Name required.")
-                        else:
-                            simg = st.session_state.get("prev_img","")
-                            if add_poll_candidate(sel_pid, nc_name.strip(),
-                                                   nc_party.strip() or "Independent",
-                                                   nc_sym.strip(), simg):
-                                st.session_state.pop("prev_img", None)
-                                st.session_state.pop("prev_sym", None)
-                                st.success(f"✅ {nc_name} added!")
-                                st.rerun()
+                    with g2:
+                        if st.button("💾 Save Candidate", key=f"apc_btn_{sel_pid}"):
+                            if not nc_name.strip():
+                                st.error("Candidate Name is required to save.")
                             else:
-                                st.error("Already exists in this poll.")
+                                simg = st.session_state.get(img_key,"")
+                                if add_poll_candidate(sel_pid, nc_name.strip(),
+                                                       nc_party.strip() or "Independent",
+                                                       nc_sym.strip(), simg):
+                                    st.session_state.pop(img_key, None)
+                                    st.session_state.pop(sym_key, None)
+                                    st.success(f"✅ {nc_name} successfully added to this poll!")
+                                    st.rerun()
+                                else:
+                                    st.error("Candidate already exists in this poll.")
 
-                st.markdown("---")
-                p_votes = get_poll_vote_counts(sel_pid)
-                p_total = total_poll_votes(sel_pid)
-                st.markdown(f"**📊 Poll Results: {p_total} votes**")
-                if p_votes:
-                    for cn, cv in sorted(p_votes.items(), key=lambda x: x[1], reverse=True):
-                        pv = round(cv/p_total*100,1) if p_total else 0
-                        st.markdown(f"**{cn}**: {cv} votes ({pv}%)")
-                        st.progress(pv/100)
-                else:
-                    st.info("No votes yet for this poll.")
-
-                if st.button("🗑️ Delete Poll", key=f"dp_{sel_pid}"):
-                    delete_poll(sel_pid)
-                    st.warning("Poll deleted.")
-                    st.rerun()
+                    st.markdown("---")
+                    col_del, _ = st.columns([1, 3])
+                    with col_del:
+                        if st.button("🗑️ Delete Entire Poll", key=f"dp_{sel_pid}"):
+                            delete_poll(sel_pid)
+                            st.warning(f"Poll '{p['name']}' deleted.")
+                            st.rerun()
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
     if st.button("🚪 Logout", key="admin_logout"):
@@ -1928,7 +2134,6 @@ if st.session_state.page == "assistant":
                     message_placeholder.markdown(full_response)
                     # Add assistant response to chat history
                     st.session_state.messages.append({"role": "assistant", "content": full_response})
-                    st.session_state.messages.append({"role": "assistant", "content": full_response})
                 except Exception as e:
                     st.error(f"Error communicating with AI: {str(e)}")
 
@@ -1944,42 +2149,127 @@ if st.session_state.page == "voter_dashboard":
         user_doc = get_user(username)
         vid = user_doc.get("vote_id", "") if user_doc else ""
         vv = get_valid_voter(vid) if vid else None
-        has_voted = vv.get("voted", False) if vv else False
-        receipt = get_receipt(vid) if vid else None
-        st.markdown('<div class="section-title">👤 My Voter Dashboard</div>', unsafe_allow_html=True)
+        
+        st.markdown('<div class="section-title">👤 Voter Dashboard</div>', unsafe_allow_html=True)
+        
+        # Calculate Stats
+        active_c = len(get_all_active_polls())
+        past_voted_c = len(get_past_polls_for_voter(vid)) if vid else 0
+        total_p = len(get_all_polls())
+        participation = round((past_voted_c / total_p * 100), 1) if total_p > 0 else 0
+
         st.markdown(f"""
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1rem 0;">
-            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.2rem;">
-                <div style="color:#64748b;font-size:0.8rem;">Full Name</div>
-                <div style="color:#e2e8f0;font-weight:600;margin-top:4px;">{user_doc.get('name','—') if user_doc else '—'}</div>
+        <div style="display:grid;grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:1.2rem; margin-bottom:2rem;">
+            <div class="stat-box">
+                <div class="label">Identity</div>
+                <div class="value" style="font-size:1.1rem;color:#a5b4fc;">{user_doc.get('name','—')}</div>
+                <div style="color:#64748b;font-size:0.7rem;margin-top:4px;">UID: {vid}</div>
             </div>
-            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.2rem;">
-                <div style="color:#64748b;font-size:0.8rem;">Voter ID</div>
-                <div style="color:#e2e8f0;font-weight:600;margin-top:4px;">{vid or '—'}</div>
+            <div class="stat-box">
+                <div class="label">Live Polls</div>
+                <div class="value">{active_c}</div>
+                <div style="color:#10b981;font-size:0.7rem;margin-top:4px;">Ready to Cast</div>
             </div>
-            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.2rem;">
-                <div style="color:#64748b;font-size:0.8rem;">Email</div>
-                <div style="color:#e2e8f0;font-weight:600;margin-top:4px;">{user_doc.get('email','—') if user_doc else '—'}</div>
-            </div>
-            <div style="background:{'rgba(16,185,129,0.1)' if has_voted else 'rgba(245,158,11,0.1)'};border:1px solid {'rgba(16,185,129,0.3)' if has_voted else 'rgba(245,158,11,0.3)'};border-radius:12px;padding:1.2rem;">
-                <div style="color:#64748b;font-size:0.8rem;">Vote Status</div>
-                <div style="color:{'#6ee7b7' if has_voted else '#fcd34d'};font-weight:700;margin-top:4px;">{'✅ Voted' if has_voted else '⏳ Not Yet Voted'}</div>
+            <div class="stat-box">
+                <div class="label">Participation</div>
+                <div class="value">{past_voted_c} <span style="font-size:0.8rem;color:#94a3b8;font-weight:400;">/{total_p}</span></div>
+                <div style="color:#6366f1;font-size:0.7rem;margin-top:4px;">{participation}% Activity</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
-        if receipt:
-            st.markdown(f"""
-            <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:1.2rem;margin-top:0.5rem;">
-                <div style="color:#94a3b8;font-size:0.82rem;margin-bottom:8px;">🧾 Your Vote Receipt</div>
-                <div style="font-family:monospace;font-size:0.72rem;color:#6ee7b7;word-break:break-all;">{receipt}</div>
-            </div>""", unsafe_allow_html=True)
-        st.markdown("---")
-        st.markdown("**📋 Registered Candidates**")
-        for c in get_candidates():
-            st.markdown(f'<div class="cand-card"><span class="cand-symbol">{c.get("symbol","🗳️")}</span><div class="cand-info"><h4>{c["name"]}</h4><p>{c.get("party","Independent")}</p></div></div>', unsafe_allow_html=True)
-        st.markdown("---")
-        if st.button("← Back to Vote Page", key="vd_back"):
-            goto("vote")
+        
+        # (Direct link box removed as per request)
+        st.markdown('<div style="margin-top:1rem;"></div>', unsafe_allow_html=True)
+
+        tab_active, tab_past = st.tabs(["🟢 Active & Upcoming", "📜 Election History"])
+
+        with tab_active:
+            active_polls = get_all_active_polls()
+            upcoming_polls = get_all_upcoming_polls()
+            if not active_polls and not upcoming_polls:
+                st.markdown('<div style="text-align:center;padding:4rem 2rem;color:#64748b;font-style:italic;">No live or scheduled elections found.</div>', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="poll-grid">', unsafe_allow_html=True)
+                # Active
+                for ap in active_polls:
+                    pid = ap["poll_id"]
+                    voted = has_voted_in_poll(pid, vid)
+                    cands = get_poll_candidates(pid)
+                    cand_html = ""
+                    if cands:
+                        items = "".join([f"<div style='display:flex;align-items:center;gap:10px;margin-bottom:6px;'><span style='font-size:1rem;'>{c.get('symbol','🗳️')}</span><span style='color:#cbd5e1;font-size:0.85rem;'>{c['name']}</span></div>" for c in cands])
+                        cand_html = f"<div style='margin:1.2rem 0;padding:1rem 0;border-top:1px solid rgba(255,255,255,0.06);border-bottom:1px solid rgba(255,255,255,0.06);'>{items}</div>"
+                    
+                    st.markdown(f"""
+                    <div class="poll-card-block">
+                        <span style="display:inline-block;padding:3px 10px;border-radius:100px;background:rgba(16,185,129,0.1);color:#6ee7b7;font-size:0.7rem;font-weight:700;text-transform:uppercase;margin-bottom:10px;">🟢 Live Now</span>
+                        <h3 style="margin:0;color:#f8fafc;font-size:1.2rem;font-weight:700;">{ap['name']}</h3>
+                        <p style="color:#94a3b8;font-size:0.8rem;margin:8px 0;height:38px;overflow:hidden;line-height:1.5;">{ap.get('description','')}</p>
+                        {cand_html}
+                        <div style="color:#f87171;font-size:0.75rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:6px;font-weight:500;">⏱️ Ends: {ap['end_time'].strftime('%d %b, %H:%M') if hasattr(ap['end_time'],'strftime') else ap['end_time']}</div>
+                        <div style="margin-top:auto;">
+                            <a href="?page=vote&user={username}&poll_id={pid}" target="_self" class="{'btn-premium-outline' if voted else 'btn-premium'}">{'View Ballot' if voted else '🗳️ Cast Vote'}</a>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # Upcoming
+                for up in upcoming_polls:
+                    st.markdown(f"""
+                    <div class="poll-card-block" style="opacity:0.75;">
+                        <span style="display:inline-block;padding:3px 10px;border-radius:100px;background:rgba(148,163,184,0.1);color:#94a3b8;font-size:0.7rem;font-weight:700;text-transform:uppercase;margin-bottom:10px;">⏳ Scheduled</span>
+                        <h3 style="margin:0;color:#cbd5e1;font-size:1.1rem;font-weight:700;">{up['name']}</h3>
+                        <p style="color:#64748b;font-size:0.8rem;margin:8px 0;height:38px;overflow:hidden;line-height:1.5;">{up.get('description','')}</p>
+                        <div style="margin:1.2rem 0;color:#64748b;font-size:0.75rem;background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;border:1px dashed rgba(255,255,255,0.08);">📅 Starts: {up['start_time'].strftime('%d %b, %H:%M') if hasattr(up['start_time'],'strftime') else up['start_time']}</div>
+                        <div style="margin-top:auto;">
+                            <div class="btn-premium-outline" style="cursor:not-allowed;opacity:0.5;border-style:dashed;color:#475569 !important;">Awaiting Start</div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+
+        with tab_past:
+            past_polls = get_past_polls()
+            if not past_polls:
+                st.markdown('<div style="text-align:center;padding:4rem 2rem;color:#64748b;font-style:italic;">No election history available.</div>', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="poll-grid">', unsafe_allow_html=True)
+                for pp in past_polls:
+                    pid = pp["poll_id"]
+                    vc = get_poll_vote_counts(pid)
+                    winner = max(vc, key=vc.get) if vc else "Decision Pending"
+                    voted = has_voted_in_poll(pid, vid)
+                    
+                    st.markdown(f"""
+                    <div class="poll-card-block">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                            <span style="display:inline-block;padding:3px 10px;border-radius:100px;background:rgba(99,102,241,0.1);color:#a5b4fc;font-size:0.7rem;font-weight:700;text-transform:uppercase;">📜 Completed</span>
+                            {f'<span style="font-size:0.65rem;background:rgba(16,185,129,0.1);color:#10b981;padding:2px 8px;border-radius:100px;font-weight:600;">✅ Voted</span>' if voted else '<span style="font-size:0.65rem;background:rgba(244,63,94,0.1);color:#f43f5e;padding:2px 8px;border-radius:100px;font-weight:600;">❌ Missed</span>'}
+                        </div>
+                        <h3 style="margin:0;color:#e2e8f0;font-size:1.15rem;font-weight:700;">{pp['name']}</h3>
+                        <div style="margin:1rem 0;color:#6ee7b7;font-size:0.85rem;background:rgba(16,185,129,0.05);padding:12px;border-radius:10px;border:1px solid rgba(16,185,129,0.1);">
+                            <span style="color:#64748b;font-size:0.7rem;display:block;margin-bottom:2px;">WINNER</span>
+                            <span style="font-weight:700;font-size:1rem;">🏆 {winner}</span>
+                        </div>
+                        <div style="color:#64748b;font-size:0.75rem;margin-bottom:1.5rem;">📅 Ended: {pp['end_time'].strftime('%d %b %Y') if hasattr(pp['end_time'],'strftime') else pp['end_time']}</div>
+                        <div style="margin-top:auto;">
+                            <a href="?page=results&user={username}&res_id={pid}" target="_self" class="btn-premium-outline">📈 View Analytics</a>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="margin-top:3rem;"></div>', unsafe_allow_html=True)
+        logout_col1, logout_col2, logout_col3 = st.columns([1, 1.5, 1])
+        with logout_col2:
+            if st.button("🚪 Logout to Voter Portal", key="vd_logout_btn_final", use_container_width=True):
+                st.session_state.clear()
+                st.query_params.clear()
+                goto("user")
+
+
+
 
 # ═══════════════════════════════════════════════════════════
 # PAGE: FAQ
@@ -2004,147 +2294,101 @@ if st.session_state.page == "faq":
         with st.expander(f"🔹 {q}"):
             st.markdown(f'<p style="color:#94a3b8;line-height:1.8;">{a}</p>', unsafe_allow_html=True)
     st.markdown("---")
-    if st.button("← Back to Home", key="faq_back"):
-        goto("home")
+    if st.button("← Back to Voter Dashboard", key="faq_back"):
+        goto("voter_dashboard")
 
 # ═══════════════════════════════════════════════════════════
 # PAGE: LIVE RESULTS
 # ═══════════════════════════════════════════════════════════
 if st.session_state.page == "results":
-    st.markdown('<div class="section-title">📊 Live Election Results</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-sub">Real-time vote counts and turnout statistics.</div>', unsafe_allow_html=True)
-    st.markdown("---")
-    vote_counts = get_vote_counts()
-    total = sum(vote_counts.values()) if vote_counts else 0
-    ev = total_eligible_voters()
-    not_voted = max(ev - total, 0)
-    if not vote_counts:
-        st.info("🗳️ No votes have been cast yet. Check back soon!")
-    else:
-        if get_winner_announced():
-            winner = max(vote_counts, key=vote_counts.get)
-            st.markdown(f'<div style="background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(99,102,241,0.1));border:1px solid rgba(16,185,129,0.4);border-radius:16px;padding:1.2rem;text-align:center;margin-bottom:1rem;"><div style="color:#6ee7b7;font-weight:700;font-size:1.1rem;">🏆 Winner: {winner}</div><div style="color:#64748b;font-size:0.85rem;">Election concluded — results are final.</div></div>', unsafe_allow_html=True)
-        if go:
-            cands_list = list(vote_counts.keys())
-            counts_list = list(vote_counts.values())
-            cols_palette = ["#6366f1","#06b6d4","#10b981","#f59e0b","#f43f5e"]
-            # Candidate Vote Pie Chart
-            fig = go.Figure(go.Pie(
-                labels=cands_list,
-                values=counts_list,
-                hole=0.45,
-                marker=dict(colors=cols_palette[:len(cands_list)],
-                            line=dict(color='#0f172a', width=3)),
-                textinfo="label+percent",
-                textfont=dict(color="#e2e8f0", size=14),
-                hovertemplate="<b>%{label}</b><br>Votes: %{value}<br>Share: %{percent}<extra></extra>",
-            ))
-            fig.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#e2e8f0", family="Inter"),
-                margin=dict(t=30,b=30,l=20,r=20),
-                showlegend=True,
-                legend=dict(font=dict(color="#94a3b8", size=13),
-                            bgcolor="rgba(0,0,0,0)"),
-                annotations=[dict(text=f"<b>{total}</b><br><span style='font-size:10px'>Total Votes</span>",
-                                  font=dict(size=18, color="#a5b4fc"), showarrow=False)]
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            for c, v in vote_counts.items():
-                pct = round(v/total*100,1) if total else 0
+    view_pid = st.session_state.get("view_poll_result_id")
+    if view_pid:
+        _poll = get_poll(view_pid)
+        if not _poll:
+            st.session_state.view_poll_result_id = None
+            st.rerun()
+            
+        st.markdown(f'<div class="section-title">📊 {_poll["name"]} Analytics</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-sub">{_poll.get("description","")}</div>', unsafe_allow_html=True)
+        if st.button("← Back to Completed Polls", key="res_back_btn"):
+            st.session_state.view_poll_result_id = None
+            st.rerun()
+            
+        st.markdown("---")
+        vote_counts = get_poll_vote_counts(view_pid)
+        total = total_poll_votes(view_pid)
+        
+        tab_over, tab_cand, tab_charts, tab_export = st.tabs(["Overview & Winner", "Candidate Breakdown", "Charts & Turnout", "Export Data"])
+        
+        with tab_over:
+            if not vote_counts:
+                st.info("No votes were cast in this election.")
+            else:
+                winner = max(vote_counts, key=vote_counts.get)
+                st.markdown(f'''
+                <div style="background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(99,102,241,0.1));
+                     border:1px solid rgba(16,185,129,0.4);border-radius:16px;padding:2rem;text-align:center;margin-bottom:1rem;">
+                  <div style="font-size:3rem;margin-bottom:10px;">🏆</div>
+                  <div style="color:#6ee7b7;font-weight:700;font-size:1.5rem;">Winner: {winner}</div>
+                  <div style="color:#94a3b8;margin-top:10px;">Total Election Votes: {total}</div>
+                </div>''', unsafe_allow_html=True)
+
+        with tab_cand:
+            st.markdown("### Candidate Vote Counts")
+            for c, v in sorted(vote_counts.items(), key=lambda item: item[1], reverse=True):
+                pct = round(v/total*100, 1) if total else 0
                 st.markdown(f"**{c}**: {v} votes ({pct}%)")
                 st.progress(pct/100)
-        st.markdown("### 🌍 Voter Turnout")
-        if go and ev > 0:
-            fig2 = go.Figure(go.Pie(
-                labels=["Voted","Not Yet Voted"], values=[total, not_voted], hole=0.6,
-                marker=dict(colors=["#6366f1","#1e293b"]),
-                textinfo="label+percent", textfont=dict(color="#e2e8f0",size=13),
-            ))
-            fig2.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#e2e8f0"),
-                margin=dict(t=20,b=20,l=20,r=20), showlegend=True,
-                legend=dict(font=dict(color="#94a3b8")),
-                annotations=[dict(text=f"<b>{round(total/ev*100,1) if ev else 0}%</b>",
-                                  font=dict(size=22,color="#a5b4fc"),showarrow=False)]
-            )
-            st.plotly_chart(fig2, use_container_width=True)
-    st.markdown("---")
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("🔄 Refresh", key="results_refresh"): st.rerun()
-    with c2:
-        if st.button("← Back to Home", key="results_back"): goto("home")
+                
+        with tab_charts:
+            if go and total > 0:
+                cands_list = list(vote_counts.keys())
+                counts_list = list(vote_counts.values())
+                cols_palette = ["#6366f1","#06b6d4","#10b981","#f59e0b","#f43f5e"]
+                fig = go.Figure(go.Pie(
+                    labels=cands_list, values=counts_list, hole=0.45,
+                    marker=dict(colors=cols_palette[:len(cands_list)], line=dict(color='#0f172a', width=3)),
+                    textinfo="label+percent", textfont=dict(color="#e2e8f0", size=14),
+                ))
+                fig.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#e2e8f0", family="Inter"),
+                    margin=dict(t=30,b=30,l=20,r=20), showlegend=True,
+                    legend=dict(font=dict(color="#94a3b8", size=13), bgcolor="rgba(0,0,0,0)"),
+                    annotations=[dict(text=f"<b>{total}</b><br><span style='font-size:10px'>Total Votes</span>",
+                                      font=dict(size=18, color="#a5b4fc"), showarrow=False)]
+                )
+                st.plotly_chart(fig, use_container_width=True)
+                
+        with tab_export:
+            st.markdown("### 📄 Download Election Results Report")
+            if not vote_counts:
+                st.info("No votes cast yet.")
+            else:
+                winner_pdf = max(vote_counts, key=vote_counts.get)
+                gen_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
 
-# ═══════════════════════════════════════════════════════════
-# ADMIN EXTRA SECTIONS (injected into dashboard context)
-# ═══════════════════════════════════════════════════════════
-if st.session_state.page == "dashboard" and st.session_state.get("admin"):
-    import datetime as dt_mod
-    st.markdown("---")
-    st.markdown('<div class="section-title" style="font-size:1.1rem;">⚙️ Election Management</div>', unsafe_allow_html=True)
+                import csv, io
+                csv_buf = io.StringIO()
+                writer = csv.writer(csv_buf)
+                writer.writerow([f"QuVote - Official Election Results: {_poll['name']}"])
+                writer.writerow(["Generated", gen_time])
+                writer.writerow([])
+                writer.writerow(["Candidate", "Votes", "Share %"])
+                for c, v in sorted(vote_counts.items(), key=lambda item: item[1], reverse=True):
+                    pct = round(v/total*100, 2) if total else 0
+                    writer.writerow([c, v, f"{pct}%"])
+                writer.writerow([])
+                writer.writerow(["Total Votes Cast", total])
+                writer.writerow(["WINNER", winner_pdf])
+                
+                st.download_button("⬇️ Download CSV Report", data=csv_buf.getvalue(), file_name=f"QuVote_Results_{view_pid}.csv", mime="text/csv", use_container_width=True)
 
-    with st.expander("⏰ Set Election End Time"):
-        current_end = get_election_end_time()
-        st.markdown(f"**Current end time:** `{current_end} UTC`" if current_end else "**No end time set yet.**")
-        col_d, col_t = st.columns(2)
-        with col_d:
-            sel_date = st.date_input("End Date", key="admin_end_date")
-        with col_t:
-            sel_time = st.time_input("End Time (UTC)", key="admin_end_time")
-        if st.button("💾 Save Election End Time", key="save_end_time"):
-            combined = dt_mod.datetime.combine(sel_date, sel_time)
-            set_election_end_time(combined)
-            st.success(f"✅ Election will close at {combined} UTC")
-        if current_end:
-            if st.button("🏁 Force Announce Results Now", key="force_results"):
-                set_election_end_time(dt_mod.datetime.utcnow() - dt_mod.timedelta(seconds=1))
-                set_winner_announced(False)
-                winner = check_and_announce_winner()
-                if winner:
-                    st.success(f"🏆 Results announced! Winner: **{winner}**")
-                else:
-                    st.warning("No votes to determine a winner yet.")
-
-    with st.expander("📄 Download Election Results Report"):
-        vote_counts_pdf = get_vote_counts()
-        total_pdf = sum(vote_counts_pdf.values()) if vote_counts_pdf else 0
-        if not vote_counts_pdf:
-            st.info("No votes cast yet.")
-        else:
-            winner_pdf = max(vote_counts_pdf, key=vote_counts_pdf.get)
-            gen_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
-
-            # ── CSV Download ──────────────────────────────────
-            import csv, io
-            csv_buf = io.StringIO()
-            writer = csv.writer(csv_buf)
-            writer.writerow(["QuVote - Official Election Results"])
-            writer.writerow(["Generated", gen_time])
-            writer.writerow([])
-            writer.writerow(["Candidate", "Votes", "Share %"])
-            for c, v in vote_counts_pdf.items():
-                pct = round(v/total_pdf*100, 2) if total_pdf else 0
-                writer.writerow([c, v, f"{pct}%"])
-            writer.writerow([])
-            writer.writerow(["Total Votes Cast", total_pdf])
-            writer.writerow(["Eligible Voters", total_eligible_voters()])
-            writer.writerow(["WINNER", winner_pdf])
-            st.download_button(
-                "⬇️ Download CSV Report", data=csv_buf.getvalue(),
-                file_name="QuVote_Results.csv", mime="text/csv"
-            )
-
-            # ── HTML Report Download ──────────────────────────
-            rows_html = "".join([
-                f"<tr><td>{c}</td><td style='text-align:center'>{v}</td>"
-                f"<td style='text-align:center'>{round(v/total_pdf*100,2) if total_pdf else 0}%</td></tr>"
-                for c, v in vote_counts_pdf.items()
-            ])
-            html_report = f"""<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<title>QuVote Results</title>
+                rows_html = "".join([
+                    f"<tr><td>{c}</td><td style='text-align:center'>{v}</td><td style='text-align:center'>{round(v/total*100,2) if total else 0}%</td></tr>"
+                    for c, v in sorted(vote_counts.items(), key=lambda item: item[1], reverse=True)
+                ])
+                html_report = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>QuVote Results</title>
 <style>
   body{{font-family:Arial,sans-serif;background:#0f172a;color:#e2e8f0;padding:40px;}}
   h1{{color:#a5b4fc;text-align:center;}} h3{{color:#6ee7b7;text-align:center;}}
@@ -2152,93 +2396,45 @@ if st.session_state.page == "dashboard" and st.session_state.get("admin"):
   th{{background:#1e293b;color:#a5b4fc;padding:10px;border:1px solid #334155;}}
   td{{padding:10px;border:1px solid #334155;}}
   .meta{{color:#64748b;text-align:center;margin-bottom:20px;font-size:0.9rem;}}
-  .winner{{background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);
-           border-radius:8px;padding:16px;text-align:center;margin-top:24px;}}
+  .winner{{background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:8px;padding:16px;text-align:center;margin-top:24px;}}
 </style></head><body>
-<h1>⚛️ QuVote — Official Election Results</h1>
-<p class="meta">Generated: {gen_time} &nbsp;|&nbsp;
-   Total Votes Cast: <strong>{total_pdf}</strong> &nbsp;|&nbsp;
-   Eligible Voters: <strong>{total_eligible_voters()}</strong></p>
-<table><thead><tr>
-  <th>Candidate</th><th>Votes</th><th>Share %</th>
-</tr></thead><tbody>{rows_html}</tbody></table>
+<h1>⚛️ QuVote — Official Election Results: {_poll['name']}</h1>
+<p class="meta">Generated: {gen_time} &nbsp;|&nbsp; Total Votes Cast: <strong>{total}</strong></p>
+<table><thead><tr><th>Candidate</th><th>Votes</th><th>Share %</th></tr></thead><tbody>{rows_html}</tbody></table>
 <div class="winner"><h3>🏆 Winner: {winner_pdf}</h3></div>
 </body></html>"""
-            st.download_button(
-                "🖨️ Download HTML Report (Print to PDF)", data=html_report,
-                file_name="QuVote_Results.html", mime="text/html"
-            )
+                st.download_button("🖨️ Download HTML Report (Print to PDF)", data=html_report, file_name=f"QuVote_Results_{view_pid}.html", mime="text/html", use_container_width=True)
 
-
-    with st.expander("🕵️ Suspicious Activity Alerts"):
-        suspicious = get_suspicious_ips()
-        if not suspicious:
-            st.success("✅ No suspicious activity detected.")
+    else:
+        st.markdown('<div class="section-title">📜 Completed Polls</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-sub">Select an election to view detailed module analytics.</div>', unsafe_allow_html=True)
+        st.markdown("---")
+        
+        past_polls = get_past_polls()
+        if not past_polls:
+            st.info("No completed elections found.")
         else:
-            st.warning(f"⚠️ {len(suspicious)} suspicious IP(s) found!")
-            for item in suspicious:
-                st.markdown(f'<div style="background:rgba(244,63,94,0.08);border:1px solid rgba(244,63,94,0.3);border-radius:8px;padding:0.8rem;margin:4px 0;"><strong style="color:#f43f5e;">IP: {item["_id"]}</strong><br><span style="color:#94a3b8;font-size:0.85rem;">Voter IDs: {", ".join(item["voter_ids"])}</span></div>', unsafe_allow_html=True)
-
-
-# ═══════════════════════════════════════════════════════════
-# PAGE: ACTIVE POLL VOTING
-# ═══════════════════════════════════════════════════════════
-if st.session_state.page == "vote":
-    # Check for an active poll and override the standard vote UI
-    _active_poll = get_active_poll()
-    if _active_poll:
-        _poll_id = _active_poll["poll_id"]
-        _poll_cands = get_poll_candidates(_poll_id)
-        username = st.session_state.get("user")
-        user_doc2 = get_user(username) if username else None
-        vid2 = user_doc2.get("vote_id","") if user_doc2 else ""
-
-        st.markdown(f'''
-        <div style="background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(139,92,246,0.1));
-             border:1px solid rgba(99,102,241,0.35);border-radius:16px;padding:1.2rem;margin:0.5rem 0;text-align:center;">
-          <div style="font-size:0.8rem;color:#6366f1;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;">Active Election</div>
-          <div style="font-size:1.2rem;font-weight:700;color:#a5b4fc;margin:6px 0;">{_active_poll["name"]}</div>
-          <div style="color:#64748b;font-size:0.85rem;">{_active_poll.get("description","")}</div>
-        </div>''', unsafe_allow_html=True)
-
-        if has_voted_in_poll(_poll_id, vid2):
-            st.markdown('''
-            <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);
-                 border-radius:14px;padding:1.5rem;text-align:center;margin:1rem 0;">
-              <div style="font-size:2.5rem;">✅</div>
-              <div style="font-weight:700;color:#6ee7b7;font-size:1.1rem;">You have already voted in this election!</div>
-            </div>''', unsafe_allow_html=True)
-        elif not _poll_cands:
-            st.warning("⚠️ No candidates have been added to this election yet.")
-        else:
-            st.markdown("**Select your candidate:**")
-            for _cand in _poll_cands:
-                _img_b64 = _cand.get("symbol_image_b64","")
-                if _img_b64:
-                    _img_html = f"<img src='data:image/png;base64,{_img_b64}' width='64' height='64' style='border-radius:10px;object-fit:cover;'>"
-                else:
-                    _img_html = f"<div style='font-size:3rem;'>{_cand.get('symbol','🗳️')}</div>"
+            for pp in past_polls:
+                vc = get_poll_vote_counts(pp["poll_id"])
+                total_v = sum(vc.values()) if vc else 0
+                winner_t = max(vc, key=vc.get) if vc else "N/A"
                 st.markdown(f'''
-                <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
-                     border-radius:12px;padding:1rem;display:flex;align-items:center;gap:1rem;margin:6px 0;">
-                  {_img_html}
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);
+                     border-radius:12px;padding:1.5rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;">
                   <div>
-                    <div style="font-weight:700;color:#e2e8f0;font-size:1rem;">{_cand["name"]}</div>
-                    <div style="color:#94a3b8;font-size:0.82rem;">{_cand.get("party","Independent")}</div>
-                    <div style="color:#64748b;font-size:0.75rem;">Symbol: {_cand.get("symbol","")}</div>
+                    <h3 style="margin:0;color:#e2e8f0;">{pp["name"]}</h3>
+                    <span style="display:inline-block;padding:3px 10px;border-radius:12px;background:rgba(16,185,129,0.1);color:#6ee7b7;font-size:0.75rem;margin:8px 0;font-weight:600;">✅ Completed</span>
+                    <div style="color:#64748b;font-size:0.85rem;">Ended: {pp["end_time"].strftime("%d %b %Y, %H:%M") if hasattr(pp["end_time"], "strftime") else pp["end_time"]}</div>
+                    <div style="color:#94a3b8;font-size:0.9rem;margin-top:8px;">Total Votes: {total_v} &bull; Winner: <b>{winner_t}</b></div>
                   </div>
                 </div>''', unsafe_allow_html=True)
+                if st.button("📊 View Details", key=f"view_res_{pp['poll_id']}"):
+                    st.session_state.view_poll_result_id = pp["poll_id"]
+                    st.rerun()
 
-            _choice = st.radio("Cast your vote for:", [c["name"] for c in _poll_cands], key="poll_vote_choice")
-            if st.button("🗳️ Submit Vote", key="submit_poll_vote"):
-                save_poll_vote(_poll_id, vid2, _choice)
-                mark_voted(vid2)
-                _receipt = generate_receipt(vid2, _choice)
-                save_receipt(vid2, _receipt)
-                voter_ip2 = get_voter_ip()
-                log_activity(vid2, voter_ip2, "vote")
-                st.session_state["last_receipt"] = _receipt
-                st.session_state["last_choice"] = _choice
-                st.success(f"✅ Vote submitted for **{_choice}**!")
-                st.rerun()
+        st.markdown("---")
+        if st.button("← Back to Voter Dashboard", key="results_back"): goto("voter_dashboard")
+
+
+
 

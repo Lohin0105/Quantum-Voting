@@ -22,6 +22,7 @@ activity_log_col  = db["activity_log"]
 receipts_col      = db["receipts"]
 polls_col         = db["polls"]
 poll_votes_col    = db["poll_votes"]
+poll_candidates_col = db["poll_candidates"]
 
 # ============================================================
 # USERS
@@ -240,15 +241,15 @@ def get_all_activity():
 # ============================================================
 # VOTE RECEIPTS
 # ============================================================
-def save_receipt(voter_id, receipt_hash):
+def save_receipt(voter_id, poll_id, receipt_hash):
     receipts_col.update_one(
-        {"voter_id": voter_id},
-        {"$set": {"voter_id": voter_id, "receipt": receipt_hash, "issued_at": datetime.utcnow()}},
+        {"voter_id": voter_id, "poll_id": poll_id},
+        {"$set": {"voter_id": voter_id, "poll_id": poll_id, "receipt": receipt_hash, "issued_at": datetime.utcnow()}},
         upsert=True
     )
 
-def get_receipt(voter_id):
-    doc = receipts_col.find_one({"voter_id": voter_id})
+def get_receipt(voter_id, poll_id):
+    doc = receipts_col.find_one({"voter_id": voter_id, "poll_id": poll_id})
     return doc["receipt"] if doc else None
 
 
@@ -262,6 +263,7 @@ def create_poll(name, description, start_time, end_time, created_by):
         "poll_id": poll_id, "name": name, "description": description,
         "start_time": start_time, "end_time": end_time,
         "created_by": created_by, "email_sent": False,
+        "results_announced": False,
         "created_at": datetime.utcnow()
     })
     return poll_id
@@ -274,34 +276,87 @@ def get_poll(poll_id):
 
 def delete_poll(poll_id):
     polls_col.delete_one({"poll_id": poll_id})
-    candidates_col.delete_many({"poll_id": poll_id})
+    poll_candidates_col.delete_many({"poll_id": poll_id})
     poll_votes_col.delete_many({"poll_id": poll_id})
 
 def mark_poll_email_sent(poll_id):
     polls_col.update_one({"poll_id": poll_id}, {"$set": {"email_sent": True}})
 
 def get_active_poll():
-    now = datetime.utcnow()
+    now = datetime.now()
     return polls_col.find_one(
         {"start_time": {"$lte": now}, "end_time": {"$gte": now}},
         {"_id": 0}
     )
 
+def get_all_active_polls():
+    now = datetime.now()
+    return list(polls_col.find(
+        {"start_time": {"$lte": now}, "end_time": {"$gte": now}},
+        {"_id": 0}
+    ).sort("start_time", -1))
+
+def get_past_polls():
+    now = datetime.now()
+    return list(polls_col.find(
+        {"end_time": {"$lt": now}},
+        {"_id": 0}
+    ).sort("end_time", -1))
+
+def get_ended_unannounced_polls():
+    now = datetime.now()
+    return list(polls_col.find(
+        {"end_time": {"$lt": now}, "results_announced": {"$ne": True}},
+        {"_id": 0}
+    ))
+
+def mark_poll_results_announced(poll_id):
+    polls_col.update_one({"poll_id": poll_id}, {"$set": {"results_announced": True}})
+
+def get_past_polls_for_voter(voter_id):
+    pipeline = [
+        {"$match": {"vote_id": voter_id}},
+        {"$lookup": {
+            "from": "polls",
+            "localField": "poll_id",
+            "foreignField": "poll_id",
+            "as": "poll_info"
+        }},
+        {"$unwind": "$poll_info"},
+        {"$project": {
+            "_id": 0,
+            "poll_id": 1,
+            "candidate": 1,
+            "timestamp": 1,
+            "poll_name": "$poll_info.name",
+            "end_time": "$poll_info.end_time",
+            "start_time": "$poll_info.start_time"
+        }},
+        {"$sort": {"timestamp": -1}}
+    ]
+    return list(poll_votes_col.aggregate(pipeline))
+
 def get_upcoming_poll():
-    now = datetime.utcnow()
+    now = datetime.now()
     return polls_col.find_one(
         {"start_time": {"$gt": now}}, {"_id": 0},
         sort=[("start_time", 1)]
     )
+
+def get_all_upcoming_polls():
+    now = datetime.now()
+    return list(polls_col.find(
+        {"start_time": {"$gt": now}}, {"_id": 0}
+    ).sort("start_time", 1))
 
 
 # ============================================================
 # POLL CANDIDATES (with AI symbol images)
 # ============================================================
 def add_poll_candidate(poll_id, name, party, symbol_name, symbol_image_b64=""):
-    if candidates_col.find_one({"poll_id": poll_id, "name": name}):
+    if poll_candidates_col.find_one({"poll_id": poll_id, "name": name}):
         return False
-    candidates_col.insert_one({
+    poll_candidates_col.insert_one({
         "poll_id": poll_id, "name": name, "party": party,
         "symbol": symbol_name, "symbol_image_b64": symbol_image_b64,
         "added_at": datetime.utcnow()
@@ -309,13 +364,13 @@ def add_poll_candidate(poll_id, name, party, symbol_name, symbol_image_b64=""):
     return True
 
 def get_poll_candidates(poll_id):
-    return list(candidates_col.find({"poll_id": poll_id}, {"_id": 0}))
+    return list(poll_candidates_col.find({"poll_id": poll_id}, {"_id": 0}))
 
 def remove_poll_candidate(poll_id, name):
-    candidates_col.delete_one({"poll_id": poll_id, "name": name})
+    poll_candidates_col.delete_one({"poll_id": poll_id, "name": name})
 
 def update_poll_candidate_image(poll_id, name, image_b64):
-    candidates_col.update_one(
+    poll_candidates_col.update_one(
         {"poll_id": poll_id, "name": name},
         {"$set": {"symbol_image_b64": image_b64}}
     )
@@ -335,6 +390,8 @@ def save_poll_vote(poll_id, vote_id, candidate):
 def has_voted_in_poll(poll_id, vote_id):
     return poll_votes_col.find_one({"poll_id": poll_id, "vote_id": vote_id}) is not None
 
+def get_poll_vote_record(poll_id, vote_id):
+    return poll_votes_col.find_one({"poll_id": poll_id, "vote_id": vote_id}, {"_id": 0})
 def get_poll_vote_counts(poll_id):
     pipeline = [
         {"$match": {"poll_id": poll_id}},
