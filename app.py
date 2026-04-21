@@ -1413,9 +1413,34 @@ if st.session_state.page == "dashboard":
             elif len(winners) > 1:
                 st.warning(f"🤝 **Tie** between: {', '.join(winners)}")
 
-            # Chart
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.bar_chart(result)
+            # Pie Chart
+            if go:
+                cands_p = list(result.keys())
+                counts_p = list(result.values())
+                cols_p = ["#6366f1","#06b6d4","#10b981","#f59e0b","#f43f5e"]
+                fig_dash = go.Figure(go.Pie(
+                    labels=cands_p, values=counts_p, hole=0.45,
+                    marker=dict(colors=cols_p[:len(cands_p)],
+                                line=dict(color='#0f172a', width=3)),
+                    textinfo="label+percent",
+                    textfont=dict(color="#e2e8f0", size=14),
+                    hovertemplate="<b>%{label}</b><br>Votes: %{value}<br>Share: %{percent}<extra></extra>",
+                ))
+                fig_dash.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="#e2e8f0", family="Inter"),
+                    margin=dict(t=20,b=20,l=20,r=20),
+                    showlegend=True,
+                    legend=dict(font=dict(color="#94a3b8", size=12),
+                                bgcolor="rgba(0,0,0,0)"),
+                    annotations=[dict(
+                        text=f"<b>{vt}</b><br>votes",
+                        font=dict(size=16, color="#a5b4fc"), showarrow=False
+                    )]
+                )
+                st.plotly_chart(fig_dash, use_container_width=True)
+            else:
+                st.bar_chart(result)
 
     # ── TAB 2: CANDIDATE MANAGER ──────────────────────────
     with t2:
