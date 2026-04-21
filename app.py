@@ -299,18 +299,24 @@ html, body, [class*="css"], .stApp {
    STREAMLIT WIDGETS OVERRIDE
 ══════════════════════════════════════════ */
 /* Inputs */
-.stTextInput input,
-.stTextArea textarea {
-  background: rgba(255,255,255,0.04) !important;
-  border: 1px solid rgba(255,255,255,0.09) !important;
+div[data-baseweb="input"], div[data-baseweb="textarea"] {
+  background: rgba(15, 23, 42, 0.6) !important;
+  border: 1px solid rgba(99, 102, 241, 0.3) !important;
   border-radius: 12px !important;
+  transition: all 0.3s ease !important;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+div[data-baseweb="input"]:focus-within, div[data-baseweb="textarea"]:focus-within {
+  border-color: #6366f1 !important;
+  background: rgba(15, 23, 42, 0.9) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25) !important;
+}
+div[data-baseweb="input"] input, div[data-baseweb="textarea"] textarea {
   color: #e2e8f0 !important;
   font-family: 'Inter', sans-serif !important;
-}
-.stTextInput input:focus,
-.stTextArea textarea:focus {
-  border-color: rgba(99,102,241,0.6) !important;
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.12) !important;
+  font-size: 1.05rem !important;
+  padding: 12px 16px !important;
+  background: transparent !important;
 }
 
 /* Buttons */
@@ -779,7 +785,7 @@ if st.session_state.page == "home":
     """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<p style="text-align:center;color:#334155;font-size:0.8rem;">📧 support@qvote.com &nbsp;|&nbsp; Built with ⚛️ Quantum Randomness</p>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align:center;color:#334155;font-size:0.8rem;">📧 quantumvoting@gmail.com &nbsp;|&nbsp; Built with ⚛️ Quantum Randomness</p>', unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════
 # PAGE: USER PANEL
@@ -1453,7 +1459,8 @@ if st.session_state.page == "assistant":
 
         client = get_grok_client()
         if not client:
-            st.error("Grok API key is not configured or openai package is missing. Please contact the administrator.")
+            has_key = bool(os.environ.get("GROK_API_KEY"))
+            st.error(f"Grok Error: API Key configured: {has_key} | `openai` library loaded: {openai is not None}. If `openai` is False, please restart your terminal/Streamlit or ensure pip and python match.")
         else:
             # Display assistant response in chat message container
             with st.chat_message("assistant"):
