@@ -679,13 +679,23 @@ if st.session_state.page != "home":
 # ═══════════════════════════════════════════════════════════
 if st.session_state.page == "home":
 
-    st.markdown("""
+    # Logo as hero centerpiece
+    import base64, pathlib
+    logo_path = pathlib.Path("logo.png")
+    logo_html = ""
+    if logo_path.exists():
+        logo_b64 = base64.b64encode(logo_path.read_bytes()).decode()
+        logo_html = f'<img src="data:image/png;base64,{logo_b64}" style="height:160px;object-fit:contain;filter:drop-shadow(0 8px 32px rgba(99,102,241,0.6));margin-bottom:1rem;">'
+
+    st.markdown(f"""
     <div class="hero-wrap">
         <div class="hero-badge">⚛️ &nbsp; Quantum-Secured Voting</div>
-        <div class="hero-title">QuVote</div>
-        <p class="hero-sub">
-            A tamper-proof, biometric-verified electronic voting platform
-            powered by quantum randomness and MongoDB Atlas.
+        {logo_html}
+        <p class="hero-sub" style="max-width:480px;margin:0 auto;text-align:center;line-height:1.9;">
+            Your vote is your voice.<br>
+            Cast it with confidence — every ballot is<br>
+            biometrically verified &amp; quantum-encrypted.<br>
+            <span style="color:#a5b4fc;font-weight:600;">Democracy, reimagined for the digital age.</span>
         </p>
     </div>
     """, unsafe_allow_html=True)
