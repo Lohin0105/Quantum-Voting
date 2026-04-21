@@ -3,6 +3,10 @@ import hashlib, time, secrets, requests, os, base64
 import cv2, numpy as np
 from dotenv import load_dotenv
 load_dotenv()
+try:
+    import openai
+except ImportError:
+    openai = None
 from database import (
     get_user, user_exists, vote_id_taken, save_user,
     admin_key_valid, get_valid_voter, mark_voter_registered,
@@ -472,9 +476,24 @@ for k, v in [("login_otp_sent", False), ("login_otp_verified", False), ("login_u
     if k not in st.session_state:
         st.session_state[k] = v
 
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "system", "content": "You are the QuVote official voter education assistant. Your job is to answer questions about the voting process, candidates, registration, and general election facts. Always maintain a neutral, helpful tone. You MUST reply in the language the user speaks. Answer concisely and accurately."},
+        {"role": "assistant", "content": "Hello! I am the QuVote Education Assistant. How can I help you today?"}
+    ]
+
 # ═══════════════════════════════════════════════════════════
 # HELPERS
 # ═══════════════════════════════════════════════════════════
+def get_grok_client():
+    api_key = os.environ.get("GROK_API_KEY", "")
+    if not api_key or openai is None:
+        return None
+    return openai.OpenAI(
+        api_key=api_key,
+        base_url="https://api.groq.com/openai/v1"
+    )
+
 def quantum_otp():
     try:
         res = requests.get(
@@ -660,7 +679,7 @@ if st.session_state.page == "home":
     </div>
     """, unsafe_allow_html=True)
 
-    col1, col2 = st.columns(2, gap="large")
+    col1, col2, col3 = st.columns(3, gap="medium")
     with col1:
         st.markdown("""
         <div class="panel-card">
@@ -703,11 +722,39 @@ if st.session_state.page == "home":
                 </svg>
             </span>
             <h3>Admin Console</h3>
-            <p>Manage candidates, voter rolls, and view live election results.</p>
+            <p>Manage candidates, voter rolls, and live election results.</p>
         </div>
         """, unsafe_allow_html=True)
         if st.button("Enter Admin Console", key="home_admin", use_container_width=True):
             goto("admin")
+
+    with col3:
+        st.markdown("""
+        <div class="panel-card">
+            <span class="icon">
+                <svg width="68" height="68" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 8px 16px rgba(16,185,129,0.4));">
+                    <defs>
+                        <linearGradient id="aiGrad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#10b981"/>
+                            <stop offset="1" stop-color="#059669"/>
+                        </linearGradient>
+                    </defs>
+                    <rect x="4" y="6" width="16" height="12" rx="3" fill="url(#aiGrad)" fill-opacity="0.9" stroke="#6ee7b7" stroke-width="1.2"/>
+                    <path d="M8 22H16" stroke="#6ee7b7" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M12 18V22" stroke="#6ee7b7" stroke-width="2" stroke-linecap="round"/>
+                    <circle cx="8" cy="11" r="1.5" fill="#ffffff"/>
+                    <circle cx="16" cy="11" r="1.5" fill="#ffffff"/>
+                    <path d="M10 14H14" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M12 3V6" stroke="#6ee7b7" stroke-width="2" stroke-linecap="round"/>
+                    <circle cx="12" cy="2" r="1" fill="#6ee7b7"/>
+                </svg>
+            </span>
+            <h3>Education Bot</h3>
+            <p>Ask our multilingual AI any questions about the voting process.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Ask Assistant", key="home_bot", use_container_width=True):
+            goto("assistant")
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
@@ -1275,3 +1322,48 @@ if st.session_state.page == "dashboard":
         st.session_state.clear()
         st.query_params.clear()
         goto("home")
+
+# ═══════════════════════════════════════════════════════════
+# PAGE: ASSISTANT
+# ═══════════════════════════════════════════════════════════
+if st.session_state.page == "assistant":
+    st.markdown('<div class="section-title">Voter Education Assistant</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-sub">Ask any questions about the voting process, candidates, or eligibility. I speak all languages!</div>', unsafe_allow_html=True)
+
+    # Display chat messages from history on app rerun
+    for msg in st.session_state.messages:
+        if msg["role"] != "system":
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+    # React to user input
+    if prompt := st.chat_input("Type your question here..."):
+        # Display user message in chat message container
+        st.chat_message("user").markdown(prompt)
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": prompt})
+
+        client = get_grok_client()
+        if not client:
+            st.error("Grok API key is not configured or openai package is missing. Please contact the administrator.")
+        else:
+            # Display assistant response in chat message container
+            with st.chat_message("assistant"):
+                message_placeholder = st.empty()
+                full_response = ""
+                try:
+                    # Request stream from Groq
+                    stream = client.chat.completions.create(
+                        model="llama3-70b-8192", 
+                        messages=st.session_state.messages,
+                        stream=True,
+                    )
+                    for chunk in stream:
+                        if chunk.choices[0].delta.content is not None:
+                            full_response += chunk.choices[0].delta.content
+                            message_placeholder.markdown(full_response + "▌")
+                    message_placeholder.markdown(full_response)
+                    # Add assistant response to chat history
+                    st.session_state.messages.append({"role": "assistant", "content": full_response})
+                except Exception as e:
+                    st.error(f"Error communicating with AI: {str(e)}")

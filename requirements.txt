@@ -5,3 +5,4 @@ requests
 pymongo
 python-dotenv
 sendgrid
+openai
