@@ -1875,45 +1875,68 @@ if st.session_state.page == "dashboard" and st.session_state.get("admin"):
                 else:
                     st.warning("No votes to determine a winner yet.")
 
-    with st.expander("📄 Download PDF Results Report"):
+    with st.expander("📄 Download Election Results Report"):
         vote_counts_pdf = get_vote_counts()
         total_pdf = sum(vote_counts_pdf.values()) if vote_counts_pdf else 0
         if not vote_counts_pdf:
             st.info("No votes cast yet.")
         else:
-            if st.button("📥 Generate PDF Report", key="gen_pdf"):
-                try:
-                    from fpdf import FPDF as _FPDF
-                    pdf = _FPDF()
-                    pdf.add_page()
-                    pdf.set_font("Helvetica", "B", 20)
-                    pdf.cell(0, 12, "QuVote - Official Election Results", ln=True, align="C")
-                    pdf.set_font("Helvetica", "", 11)
-                    pdf.cell(0, 8, f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}", ln=True, align="C")
-                    pdf.ln(8)
-                    pdf.set_font("Helvetica", "B", 13)
-                    pdf.cell(0, 10, f"Total Votes Cast: {total_pdf}", ln=True)
-                    pdf.cell(0, 10, f"Eligible Voters: {total_eligible_voters()}", ln=True)
-                    pdf.ln(6)
-                    pdf.set_font("Helvetica", "B", 12)
-                    pdf.cell(80, 10, "Candidate", border=1)
-                    pdf.cell(40, 10, "Votes", border=1)
-                    pdf.cell(40, 10, "Share %", border=1, ln=True)
-                    pdf.set_font("Helvetica", "", 11)
-                    for c, v in vote_counts_pdf.items():
-                        pct = round(v/total_pdf*100, 2) if total_pdf else 0
-                        pdf.cell(80, 10, c, border=1)
-                        pdf.cell(40, 10, str(v), border=1)
-                        pdf.cell(40, 10, f"{pct}%", border=1, ln=True)
-                    if vote_counts_pdf:
-                        w = max(vote_counts_pdf, key=vote_counts_pdf.get)
-                        pdf.ln(8)
-                        pdf.set_font("Helvetica", "B", 14)
-                        pdf.cell(0, 12, f"WINNER: {w}", ln=True, align="C")
-                    st.download_button("⬇️ Download PDF", data=bytes(pdf.output()),
-                                       file_name="QuVote_Results.pdf", mime="application/pdf")
-                except Exception as e:
-                    st.error(f"PDF Error: {e}")
+            winner_pdf = max(vote_counts_pdf, key=vote_counts_pdf.get)
+            gen_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+
+            # ── CSV Download ──────────────────────────────────
+            import csv, io
+            csv_buf = io.StringIO()
+            writer = csv.writer(csv_buf)
+            writer.writerow(["QuVote - Official Election Results"])
+            writer.writerow(["Generated", gen_time])
+            writer.writerow([])
+            writer.writerow(["Candidate", "Votes", "Share %"])
+            for c, v in vote_counts_pdf.items():
+                pct = round(v/total_pdf*100, 2) if total_pdf else 0
+                writer.writerow([c, v, f"{pct}%"])
+            writer.writerow([])
+            writer.writerow(["Total Votes Cast", total_pdf])
+            writer.writerow(["Eligible Voters", total_eligible_voters()])
+            writer.writerow(["WINNER", winner_pdf])
+            st.download_button(
+                "⬇️ Download CSV Report", data=csv_buf.getvalue(),
+                file_name="QuVote_Results.csv", mime="text/csv"
+            )
+
+            # ── HTML Report Download ──────────────────────────
+            rows_html = "".join([
+                f"<tr><td>{c}</td><td style='text-align:center'>{v}</td>"
+                f"<td style='text-align:center'>{round(v/total_pdf*100,2) if total_pdf else 0}%</td></tr>"
+                for c, v in vote_counts_pdf.items()
+            ])
+            html_report = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>QuVote Results</title>
+<style>
+  body{{font-family:Arial,sans-serif;background:#0f172a;color:#e2e8f0;padding:40px;}}
+  h1{{color:#a5b4fc;text-align:center;}} h3{{color:#6ee7b7;text-align:center;}}
+  table{{width:100%;border-collapse:collapse;margin-top:20px;}}
+  th{{background:#1e293b;color:#a5b4fc;padding:10px;border:1px solid #334155;}}
+  td{{padding:10px;border:1px solid #334155;}}
+  .meta{{color:#64748b;text-align:center;margin-bottom:20px;font-size:0.9rem;}}
+  .winner{{background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);
+           border-radius:8px;padding:16px;text-align:center;margin-top:24px;}}
+</style></head><body>
+<h1>⚛️ QuVote — Official Election Results</h1>
+<p class="meta">Generated: {gen_time} &nbsp;|&nbsp;
+   Total Votes Cast: <strong>{total_pdf}</strong> &nbsp;|&nbsp;
+   Eligible Voters: <strong>{total_eligible_voters()}</strong></p>
+<table><thead><tr>
+  <th>Candidate</th><th>Votes</th><th>Share %</th>
+</tr></thead><tbody>{rows_html}</tbody></table>
+<div class="winner"><h3>🏆 Winner: {winner_pdf}</h3></div>
+</body></html>"""
+            st.download_button(
+                "🖨️ Download HTML Report (Print to PDF)", data=html_report,
+                file_name="QuVote_Results.html", mime="text/html"
+            )
+
 
     with st.expander("🕵️ Suspicious Activity Alerts"):
         suspicious = get_suspicious_ips()
