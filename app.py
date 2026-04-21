@@ -118,7 +118,7 @@ html, body, [class*="css"], .stApp {
   color: #64748b;
   font-size: 1.05rem;
   line-height: 1.7;
-  max-width: 540px;
+  max-width: 900px;
   margin: 0 auto 2.5rem;
 }
 
@@ -663,6 +663,44 @@ def goto(page):
     st.rerun()
 
 # ═══════════════════════════════════════════════════════════
+# SPLASH SCREEN (shown once for 2 seconds on first load)
+# ═══════════════════════════════════════════════════════════
+import base64, pathlib
+logo_path = pathlib.Path("logo.png")
+if not st.session_state.get("splash_done", False):
+    st.session_state.splash_done = True
+    if logo_path.exists():
+        logo_b64 = base64.b64encode(logo_path.read_bytes()).decode()
+        st.markdown(f"""
+        <style>
+        #splash-overlay {{
+            position:fixed;top:0;left:0;width:100vw;height:100vh;
+            background:#0f172a;display:flex;flex-direction:column;
+            align-items:center;justify-content:center;z-index:99999;
+            animation: splashFade 0.5s ease 1.8s forwards;
+        }}
+        .splash-icon {{
+            animation: splashZoom 1.8s ease forwards;
+            border-radius: 50%;
+        }}
+        @keyframes splashZoom {{
+            0%   {{ transform: scale(0.2); opacity:0; }}
+            40%  {{ transform: scale(1.15); opacity:1; }}
+            70%  {{ transform: scale(0.95); opacity:1; }}
+            100% {{ transform: scale(1.05); opacity:1; }}
+        }}
+        @keyframes splashFade {{ to {{ opacity:0; pointer-events:none; }} }}
+        </style>
+        <div id="splash-overlay">
+            <img class="splash-icon" src="data:image/png;base64,{logo_b64}"
+                 style="height:260px;width:260px;object-fit:contain;
+                 border-radius:50%;filter:drop-shadow(0 0 40px rgba(99,102,241,0.9));">
+        </div>
+        """, unsafe_allow_html=True)
+        time.sleep(2)
+        st.rerun()
+
+# ═══════════════════════════════════════════════════════════
 # NAV BAR
 # ═══════════════════════════════════════════════════════════
 if st.session_state.page != "home":
@@ -679,23 +717,13 @@ if st.session_state.page != "home":
 # ═══════════════════════════════════════════════════════════
 if st.session_state.page == "home":
 
-    # Logo as hero centerpiece
-    import base64, pathlib
-    logo_path = pathlib.Path("logo.png")
-    logo_html = ""
-    if logo_path.exists():
-        logo_b64 = base64.b64encode(logo_path.read_bytes()).decode()
-        logo_html = f'<img src="data:image/png;base64,{logo_b64}" style="height:160px;object-fit:contain;filter:drop-shadow(0 8px 32px rgba(99,102,241,0.6));margin-bottom:1rem;">'
-
-    st.markdown(f"""
+    st.markdown("""
     <div class="hero-wrap">
-        <div class="hero-badge">⚛️ &nbsp; Quantum-Secured Voting</div>
-        {logo_html}
-        <p class="hero-sub" style="max-width:480px;margin:0 auto;text-align:center;line-height:1.9;">
-            Your vote is your voice.<br>
-            Cast it with confidence — every ballot is<br>
-            biometrically verified &amp; quantum-encrypted.<br>
-            <span style="color:#a5b4fc;font-weight:600;">Democracy, reimagined for the digital age.</span>
+        <div class="hero-title">QuVote</div>
+        <p class="hero-sub" style="max-width:900px;margin:0 auto;text-align:center;line-height:1.9;">
+            Your vote is your voice. Cast it with confidence — every ballot is
+            biometrically verified &amp; quantum-encrypted.
+            <span style="color:#a5b4fc;font-weight:600;"> Democracy, reimagined for the digital age.</span>
         </p>
     </div>
     """, unsafe_allow_html=True)
