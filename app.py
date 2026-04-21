@@ -664,7 +664,18 @@ if st.session_state.page == "home":
     with col1:
         st.markdown("""
         <div class="panel-card">
-            <span class="icon">👤</span>
+            <span class="icon">
+                <svg width="68" height="68" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 8px 16px rgba(6,182,212,0.4));">
+                    <defs>
+                        <linearGradient id="userGrad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#06b6d4"/>
+                            <stop offset="1" stop-color="#3b82f6"/>
+                        </linearGradient>
+                    </defs>
+                    <circle cx="12" cy="7" r="4.5" fill="url(#userGrad)" fill-opacity="0.9" stroke="#a5f3fc" stroke-width="1.2"/>
+                    <path d="M4.5 20.5C4.5 16.9101 7.85786 14 12 14C16.1421 14 19.5 16.9101 19.5 20.5C19.5 20.7761 19.2761 21 19 21H5C4.72386 21 4.5 20.7761 4.5 20.5Z" fill="url(#userGrad)" fill-opacity="0.9" stroke="#a5f3fc" stroke-width="1.2"/>
+                </svg>
+            </span>
             <h3>Voter Portal</h3>
             <p>Register, verify your identity, and cast your secure quantum vote.</p>
         </div>
@@ -675,7 +686,22 @@ if st.session_state.page == "home":
     with col2:
         st.markdown("""
         <div class="panel-card">
-            <span class="icon">🛠️</span>
+            <span class="icon">
+                <svg width="68" height="68" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 8px 16px rgba(139,92,246,0.4));">
+                    <defs>
+                        <linearGradient id="shieldGrad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#8b5cf6"/>
+                            <stop offset="1" stop-color="#6366f1"/>
+                        </linearGradient>
+                        <linearGradient id="lockGrad" x1="12" y1="8" x2="12" y2="16" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#ffffff"/>
+                            <stop offset="1" stop-color="#c7d2fe"/>
+                        </linearGradient>
+                    </defs>
+                    <path d="M12 22C12 22 20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z" fill="url(#shieldGrad)" fill-opacity="0.9" stroke="#c4b5fd" stroke-width="1.5" stroke-linejoin="round"/>
+                    <path d="M12 8C10.8954 8 10 8.89543 10 10V11H9.5C8.67157 11 8 11.6716 8 12.5V14.5C8 15.3284 8.67157 16 9.5 16H14.5C15.3284 16 16 15.3284 16 14.5V12.5C16 11.6716 15.3284 11 14.5 11H14V10C14 8.89543 13.1046 8 12 8ZM11 10C11 9.44772 11.4477 9 12 9C12.5523 9 13 9.44772 13 10V11H11V10Z" fill="url(#lockGrad)"/>
+                </svg>
+            </span>
             <h3>Admin Console</h3>
             <p>Manage candidates, voter rolls, and view live election results.</p>
         </div>
