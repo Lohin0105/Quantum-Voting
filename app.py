@@ -3,6 +3,7 @@ import hashlib, time, secrets, requests, os, base64
 import cv2, numpy as np
 from dotenv import load_dotenv
 from datetime import datetime, timezone
+import ui_assets
 load_dotenv()
 try:
     import openai
@@ -49,532 +50,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ═══════════════════════════════════════════════════════════
-# PREMIUM CSS
-# ═══════════════════════════════════════════════════════════
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700;800&display=swap');
+# ── UI ASSETS INJECTION ──────────────────────────────
+ui_assets.inject_custom_css()
 
-/* ── Root Variables ───────────────────────── */
-:root {
-  --bg-deep:   #06090f;
-  --bg-card:   rgba(255,255,255,0.04);
-  --border:    rgba(255,255,255,0.08);
-  --blue:      #6366f1;
-  --blue-soft: rgba(99,102,241,0.15);
-  --violet:    #8b5cf6;
-  --teal:      #06b6d4;
-  --green:     #10b981;
-  --red:       #f43f5e;
-  --amber:     #f59e0b;
-  --text:      #e2e8f0;
-  --muted:     #64748b;
-  --grad:      linear-gradient(135deg, #6366f1, #8b5cf6);
-  --grad-teal: linear-gradient(135deg, #06b6d4, #6366f1);
-}
-
-/* ── Global Reset ─────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; }
-
-html, body, [class*="css"], .stApp {
-  font-family: 'Inter', sans-serif !important;
-  color: var(--text) !important;
-}
-
-.stApp {
-  background: radial-gradient(ellipse at top, #0f1429 0%, #06090f 60%) !important;
-  min-height: 100vh;
-}
-
-.block-container {
-  padding: 2.5rem 2rem 4rem !important;
-  max-width: 860px !important;
-}
-
-/* ── Hide default UI chrome ───────────────── */
-#MainMenu, footer, header { visibility: hidden !important; }
-[data-testid="stToolbar"] { display: none !important; }
-
-/* ── Scrollbar ────────────────────────────── */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.4); border-radius: 3px; }
-
-/* ══════════════════════════════════════════
-   HERO
-══════════════════════════════════════════ */
-.hero-wrap {
-  text-align: center;
-  padding: 3rem 1rem 2.5rem;
-}
-.hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(99,102,241,0.12);
-  border: 1px solid rgba(99,102,241,0.3);
-  border-radius: 100px;
-  padding: 6px 18px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: #a5b4fc;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin-bottom: 1.5rem;
-}
-.hero-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: clamp(2.6rem, 6vw, 4rem);
-  font-weight: 800;
-  line-height: 1.1;
-  background: linear-gradient(135deg, #a5b4fc 0%, #c4b5fd 50%, #67e8f9 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 1rem;
-}
-.hero-sub {
-  color: #64748b;
-  font-size: 1.05rem;
-  line-height: 1.7;
-  max-width: 900px;
-  margin: 0 auto 2.5rem;
-}
-
-/* ══════════════════════════════════════════
-   CARDS
-══════════════════════════════════════════ */
-/* ── CARDS & PANELS ───────────────────────── */
-.card {
-  background: rgba(255,255,255,0.03);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 24px;
-  padding: 2rem;
-  margin: 1rem 0;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.card:hover { 
-  border-color: rgba(99,102,241,0.4);
-  background: rgba(255,255,255,0.05);
-  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-}
-
-.poll-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.5rem;
-  margin: 2rem 0;
-}
-
-.poll-card-block {
-  background: linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 20px;
-  padding: 1.8rem;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-.poll-card-block:hover {
-  transform: translateY(-5px);
-  border-color: rgba(99,102,241,0.3);
-  box-shadow: 0 15px 35px rgba(0,0,0,0.4);
-}
-.poll-card-block::before {
-  content: "";
-  position: absolute;
-  top: 0; left: 0; width: 100%; height: 4px;
-  background: var(--grad);
-  opacity: 0.8;
-}
-
-.btn-premium {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px 24px;
-  background: var(--grad);
-  color: white !important;
-  border-radius: 12px;
-  font-weight: 700;
-  text-decoration: none !important;
-  transition: all 0.2s ease;
-  border: none;
-  cursor: pointer;
-  width: 100%;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-size: 0.85rem;
-}
-.btn-premium:hover {
-  transform: scale(1.02);
-  filter: brightness(1.1);
-  box-shadow: 0 8px 20px rgba(99,102,241,0.4);
-}
-.btn-premium-outline {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 11px 23px;
-  background: transparent;
-  color: #a5b4fc !important;
-  border: 1px solid rgba(99,102,241,0.4);
-  border-radius: 12px;
-  font-weight: 600;
-  text-decoration: none !important;
-  transition: all 0.2s ease;
-  cursor: pointer;
-  width: 100%;
-  font-size: 0.85rem;
-}
-.btn-premium-outline:hover {
-  background: rgba(99,102,241,0.1);
-  border-color: rgba(99,102,241,0.8);
-}
-
-.stat-box {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 16px;
-  padding: 1.2rem;
-  text-align: center;
-}
-.stat-box .label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
-.stat-box .value { color: #f8fafc; font-size: 1.4rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; }
-
-.panel-card {
-  background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
-  border: 1px solid var(--border);
-  border-radius: 24px;
-  padding: 2.2rem;
-  text-align: center;
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  cursor: pointer;
-  height: 280px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: center;
-  position: relative;
-  overflow: hidden;
-}
-.panel-card:hover {
-  border-color: rgba(99,102,241,0.4);
-  transform: translateY(-8px) scale(1.02);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  background: rgba(255,255,255,0.06);
-}
-.panel-card::after {
-  content: "";
-  position: absolute;
-  top: -50%; left: -50%; width: 200%; height: 200%;
-  background: radial-gradient(circle, rgba(99,102,241,0.1) 0%, transparent 70%);
-  opacity: 0; transition: opacity 0.3s;
-}
-.panel-card:hover::after { opacity: 1; }
-
-/* ══════════════════════════════════════════
-   SECTION HEADERS
-══════════════════════════════════════════ */
-.section-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: #e2e8f0;
-  margin-bottom: 0.3rem;
-}
-.section-sub {
-  color: #64748b;
-  font-size: 0.9rem;
-  margin-bottom: 1.8rem;
-}
-.divider {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(99,102,241,0.4), transparent);
-  margin: 1.8rem 0;
-}
-
-/* ══════════════════════════════════════════
-   STAT CHIPS
-══════════════════════════════════════════ */
-.stat-row {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin: 1rem 0 1.5rem;
-}
-.stat-chip {
-  flex: 1;
-  min-width: 110px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 14px;
-  padding: 1rem 1.2rem;
-  text-align: center;
-}
-.stat-chip .num {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: #a5b4fc;
-  display: block;
-}
-.stat-chip .lbl {
-  font-size: 0.78rem;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-/* ══════════════════════════════════════════
-   CANDIDATE CARDS (voting)
-══════════════════════════════════════════ */
-.cand-card {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 16px;
-  padding: 1.1rem 1.4rem;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin: 8px 0;
-  transition: all 0.2s ease;
-}
-.cand-card:hover {
-  border-color: rgba(99,102,241,0.4);
-  background: rgba(99,102,241,0.06);
-}
-.cand-symbol { font-size: 2rem; }
-.cand-info h4 {
-  margin: 0; font-size: 1rem; font-weight: 700; color: #e2e8f0;
-}
-.cand-info p {
-  margin: 2px 0 0; font-size: 0.8rem; color: #64748b;
-}
-
-/* ══════════════════════════════════════════
-   VOTER RESULT ROW
-══════════════════════════════════════════ */
-.result-row {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 14px;
-  padding: 1rem 1.4rem;
-  margin: 8px 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.result-bar-wrap {
-  width: 100%;
-  background: rgba(255,255,255,0.05);
-  border-radius: 100px;
-  height: 6px;
-  margin-top: 6px;
-  overflow: hidden;
-}
-.result-bar {
-  height: 6px;
-  border-radius: 100px;
-  background: var(--grad);
-}
-
-/* ══════════════════════════════════════════
-   BADGE PILLS
-══════════════════════════════════════════ */
-.pill {
-  display: inline-block;
-  padding: 3px 12px;
-  border-radius: 100px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.pill-blue   { background: rgba(99,102,241,0.15); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); }
-.pill-green  { background: rgba(16,185,129,0.12); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.25); }
-.pill-amber  { background: rgba(245,158,11,0.12); color: #fcd34d; border: 1px solid rgba(245,158,11,0.25); }
-.pill-red    { background: rgba(244,63,94,0.12);  color: #fca5a5; border: 1px solid rgba(244,63,94,0.25);  }
-
-/* ══════════════════════════════════════════
-   STREAMLIT WIDGETS OVERRIDE
-══════════════════════════════════════════ */
-/* Inputs */
-div[data-baseweb="input"], div[data-baseweb="textarea"] {
-  background: rgba(15, 23, 42, 0.6) !important;
-  border: 1px solid rgba(99, 102, 241, 0.3) !important;
-  border-radius: 12px !important;
-  transition: all 0.3s ease !important;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1) !important;
-}
-div[data-baseweb="input"]:focus-within, div[data-baseweb="textarea"]:focus-within {
-  border-color: #6366f1 !important;
-  background: rgba(15, 23, 42, 0.9) !important;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25) !important;
-}
-div[data-baseweb="input"] input, div[data-baseweb="textarea"] textarea {
-  color: #e2e8f0 !important;
-  font-family: 'Inter', sans-serif !important;
-  font-size: 1.05rem !important;
-  padding: 12px 16px !important;
-  background: transparent !important;
-}
-
-/* Buttons */
-.stButton > button {
-  background: rgba(255,255,255,0.04) !important;
-  border: 1px solid rgba(255,255,255,0.1) !important;
-  border-radius: 12px !important;
-  color: #c7d2fe !important;
-  font-family: 'Inter', sans-serif !important;
-  font-weight: 600 !important;
-  letter-spacing: 0.01em !important;
-  padding: 0.55rem 1.4rem !important;
-  transition: all 0.2s ease !important;
-  width: 100% !important;
-}
-.stButton > button:hover {
-  background: rgba(99,102,241,0.15) !important;
-  border-color: rgba(99,102,241,0.5) !important;
-  color: #a5b4fc !important;
-  transform: translateY(-1px) !important;
-  box-shadow: 0 6px 24px rgba(99,102,241,0.2) !important;
-}
-.stButton > button:active { transform: translateY(0) !important; }
-
-/* Radio */
-.stRadio [data-testid="stWidgetLabel"] { color: #94a3b8 !important; font-weight: 500 !important; }
-.stRadio > div > div {
-  background: rgba(255,255,255,0.02) !important;
-  border-radius: 12px !important;
-  padding: 0.6rem !important;
-  gap: 8px !important;
-}
-
-/* Tabs */
-.stTabs [data-baseweb="tab-list"] {
-  background: rgba(255,255,255,0.03) !important;
-  border: 1px solid rgba(255,255,255,0.07) !important;
-  border-radius: 14px !important;
-  padding: 5px !important;
-  gap: 4px !important;
-}
-.stTabs [data-baseweb="tab"] {
-  border-radius: 10px !important;
-  color: #64748b !important;
-  font-weight: 600 !important;
-  font-family: 'Inter', sans-serif !important;
-  font-size: 0.87rem !important;
-}
-.stTabs [aria-selected="true"] {
-  background: rgba(99,102,241,0.18) !important;
-  color: #a5b4fc !important;
-}
-
-/* Labels */
-label, p { color: #94a3b8 !important; }
-h1, h2, h3 { color: #e2e8f0 !important; }
-
-/* Alert boxes */
-.stSuccess > div, .stError > div, .stWarning > div, .stInfo > div {
-  border-radius: 12px !important;
-  border: none !important;
-  font-family: 'Inter', sans-serif !important;
-}
-
-/* Selectbox */
-.stSelectbox > div > div {
-  background: rgba(255,255,255,0.04) !important;
-  border: 1px solid rgba(255,255,255,0.09) !important;
-  border-radius: 12px !important;
-  color: #e2e8f0 !important;
-}
-
-/* Camera */
-[data-testid="stCameraInput"] > div {
-  border-radius: 16px !important;
-  overflow: hidden !important;
-  border: 1px solid rgba(255,255,255,0.09) !important;
-}
-
-/* Metric */
-[data-testid="stMetric"] {
-  background: rgba(255,255,255,0.03) !important;
-  border: 1px solid rgba(255,255,255,0.07) !important;
-  border-radius: 16px !important;
-  padding: 1.2rem !important;
-}
-[data-testid="stMetricValue"] {
-  font-family: 'Space Grotesk', sans-serif !important;
-  color: #a5b4fc !important;
-}
-
-/* Bar chart */
-.vega-embed { border-radius: 16px !important; }
-
-/* Expander */
-.streamlit-expanderHeader {
-  background: rgba(255,255,255,0.03) !important;
-  border-radius: 12px !important;
-  border: 1px solid rgba(255,255,255,0.07) !important;
-  color: #94a3b8 !important;
-  font-weight: 600 !important;
-}
-
-/* ══════════════════════════════════════════
-   MOBILE RESPONSIVENESS
-══════════════════════════════════════════ */
-@media (max-width: 768px) {
-  .block-container {
-    padding: 1.5rem 1rem 3rem !important;
-  }
-  .hero-wrap {
-    padding: 1.5rem 0.5rem 1.5rem;
-  }
-  .hero-title {
-    font-size: 2.2rem !important;
-  }
-  .hero-sub {
-    font-size: 0.95rem;
-  }
-  .panel-card {
-    padding: 1.5rem 1rem;
-    margin-bottom: 15px;
-  }
-  .card {
-    padding: 1.2rem;
-  }
-  .stat-row {
-    gap: 8px;
-  }
-  .stat-chip {
-    padding: 0.8rem;
-    min-width: 46%; /* Forces 2x2 grid on mobile */
-  }
-  .stat-chip .num {
-    font-size: 1.4rem;
-  }
-  .cand-card {
-    padding: 1rem;
-    gap: 10px;
-  }
-  .result-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-  }
-  .result-bar-wrap {
-    width: 100%;
-  }
-}
-</style>
-""", unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════
 # SESSION STATE  — persisted via query params so refresh keeps user logged in
@@ -702,13 +180,19 @@ def check_and_announce_poll_winners():
 
 
 def generate_symbol_image(symbol_name):
-    """Generate candidate symbol image via Pollinations.ai."""
+    """Generate high-quality election symbol images via AI with cache bypassing."""
     try:
-        import urllib.parse
-        prompt = symbol_name + " election symbol flat vector icon colorful white background clean simple"
+        import urllib.parse, random
+        # Enhanced prompt for better artistic quality and professional iconography
+        prompt = (f"{symbol_name} election symbol, professional flat vector icon, "
+                  "vibrant colors, minimalist clean luxury aesthetic, white background, "
+                  "high resolution, symmetrical design, masterpiece quality")
         prompt_enc = urllib.parse.quote(prompt)
-        url = f"https://image.pollinations.ai/prompt/{prompt_enc}?width=256&height=256&nologo=true"
-        resp = requests.get(url, timeout=20)
+        # Random seed ensures a unique generation attempt every time to bypass server caching
+        seed = random.randint(1000, 99999)
+        url = f"https://image.pollinations.ai/prompt/{prompt_enc}?width=512&height=512&nologo=true&seed={seed}&model=flux"
+        
+        resp = requests.get(url, timeout=25)
         if resp.status_code == 200:
             return base64.b64encode(resp.content).decode()
     except Exception as e:
@@ -992,20 +476,9 @@ if st.session_state.page == "home":
 
     col1, col2, col3 = st.columns(3, gap="medium")
     with col1:
-        st.markdown("""
+        st.markdown(f"""
         <div class="panel-card">
-            <span class="icon">
-                <svg width="68" height="68" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 8px 16px rgba(6,182,212,0.4));">
-                    <defs>
-                        <linearGradient id="userGrad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
-                            <stop stop-color="#06b6d4"/>
-                            <stop offset="1" stop-color="#3b82f6"/>
-                        </linearGradient>
-                    </defs>
-                    <circle cx="12" cy="7" r="4.5" fill="url(#userGrad)" fill-opacity="0.9" stroke="#a5f3fc" stroke-width="1.2"/>
-                    <path d="M4.5 20.5C4.5 16.9101 7.85786 14 12 14C16.1421 14 19.5 16.9101 19.5 20.5C19.5 20.7761 19.2761 21 19 21H5C4.72386 21 4.5 20.7761 4.5 20.5Z" fill="url(#userGrad)" fill-opacity="0.9" stroke="#a5f3fc" stroke-width="1.2"/>
-                </svg>
-            </span>
+            <span class="icon">{ui_assets.ICON_USER}</span>
             <h3>Voter Portal</h3>
             <p>Register, verify your identity, and cast your secure quantum vote.</p>
         </div>
@@ -1014,24 +487,9 @@ if st.session_state.page == "home":
             goto("user")
 
     with col2:
-        st.markdown("""
+        st.markdown(f"""
         <div class="panel-card">
-            <span class="icon">
-                <svg width="68" height="68" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 8px 16px rgba(139,92,246,0.4));">
-                    <defs>
-                        <linearGradient id="shieldGrad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
-                            <stop stop-color="#8b5cf6"/>
-                            <stop offset="1" stop-color="#6366f1"/>
-                        </linearGradient>
-                        <linearGradient id="lockGrad" x1="12" y1="8" x2="12" y2="16" gradientUnits="userSpaceOnUse">
-                            <stop stop-color="#ffffff"/>
-                            <stop offset="1" stop-color="#c7d2fe"/>
-                        </linearGradient>
-                    </defs>
-                    <path d="M12 22C12 22 20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z" fill="url(#shieldGrad)" fill-opacity="0.9" stroke="#c4b5fd" stroke-width="1.5" stroke-linejoin="round"/>
-                    <path d="M12 8C10.8954 8 10 8.89543 10 10V11H9.5C8.67157 11 8 11.6716 8 12.5V14.5C8 15.3284 8.67157 16 9.5 16H14.5C15.3284 16 16 15.3284 16 14.5V12.5C16 11.6716 15.3284 11 14.5 11H14V10C14 8.89543 13.1046 8 12 8ZM11 10C11 9.44772 11.4477 9 12 9C12.5523 9 13 9.44772 13 10V11H11V10Z" fill="url(#lockGrad)"/>
-                </svg>
-            </span>
+            <span class="icon">{ui_assets.ICON_ADMIN}</span>
             <h3>Admin Console</h3>
             <p>Manage candidates, voter rolls, and live election results.</p>
         </div>
@@ -1040,26 +498,9 @@ if st.session_state.page == "home":
             goto("admin")
 
     with col3:
-        st.markdown("""
+        st.markdown(f"""
         <div class="panel-card">
-            <span class="icon">
-                <svg width="68" height="68" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 8px 16px rgba(16,185,129,0.4));">
-                    <defs>
-                        <linearGradient id="aiGrad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
-                            <stop stop-color="#10b981"/>
-                            <stop offset="1" stop-color="#059669"/>
-                        </linearGradient>
-                    </defs>
-                    <rect x="4" y="6" width="16" height="12" rx="3" fill="url(#aiGrad)" fill-opacity="0.9" stroke="#6ee7b7" stroke-width="1.2"/>
-                    <path d="M8 22H16" stroke="#6ee7b7" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M12 18V22" stroke="#6ee7b7" stroke-width="2" stroke-linecap="round"/>
-                    <circle cx="8" cy="11" r="1.5" fill="#ffffff"/>
-                    <circle cx="16" cy="11" r="1.5" fill="#ffffff"/>
-                    <path d="M10 14H14" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
-                    <path d="M12 3V6" stroke="#6ee7b7" stroke-width="2" stroke-linecap="round"/>
-                    <circle cx="12" cy="2" r="1" fill="#6ee7b7"/>
-                </svg>
-            </span>
+            <span class="icon">{ui_assets.ICON_AI}</span>
             <h3>Education Bot</h3>
             <p>Ask our multilingual AI any questions about the voting process.</p>
         </div>
@@ -1069,24 +510,26 @@ if st.session_state.page == "home":
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-    # Winner Banner
-    if get_winner_announced():
-        vote_counts = get_vote_counts()
-        if vote_counts:
-            winner = max(vote_counts, key=vote_counts.get)
-            st.markdown(f"""
-            <div style="background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(99,102,241,0.1));
-                 border:1px solid rgba(16,185,129,0.4);border-radius:16px;padding:1.5rem;text-align:center;margin:1rem 0;">
-                <div style="font-size:2rem;margin-bottom:6px;">🏆</div>
-                <div style="color:#6ee7b7;font-weight:700;font-size:1.1rem;">Election Results Declared!</div>
-                <div style="color:#fff;font-size:1.6rem;font-weight:800;margin:8px 0;">{winner}</div>
-                <div style="color:#64748b;font-size:0.88rem;">Results have been emailed to all registered voters.</div>
-            </div>
-            """, unsafe_allow_html=True)
+    # (Winner Banner removed to focus on live polls)
+
+    # Active poll featured banner
+    active_poll = get_active_poll()
+    if active_poll:
+        st.markdown(f"""
+        <div style="background:linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.05));
+             border:1px solid rgba(99,102,241,0.3); border-radius:20px; padding:2rem; text-align:center; margin:1rem 0;">
+            <div style="display:inline-block; padding:4px 12px; border-radius:100px; background:rgba(99,102,241,0.15); color:#a5b4fc; font-size:0.75rem; font-weight:700; text-transform:uppercase; margin-bottom:12px;">🔴 Live Election</div>
+            <h2 style="margin:0; color:#fff; font-size:1.8rem; font-weight:800;">{active_poll['name']}</h2>
+            <p style="color:#94a3b8; font-size:0.95rem; margin:10px 0 20px;">{active_poll.get('description', 'Cast your vote in the ongoing election.')}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("🗳️ Cast Your Vote", key="home_vote_now", use_container_width=True):
+            goto("user_login")
 
     # Election Countdown Timer
     end_time = get_election_end_time()
-    if end_time and not get_winner_announced():
+    if end_time and not get_winner_announced() and not active_poll:
+        # Show global countdown only if no specific active poll is featured (or could be integrated)
         import pytz
         end_iso = end_time.strftime('%Y-%m-%dT%H:%M:%SZ') if hasattr(end_time, 'strftime') else str(end_time)
         st.markdown(f"""
@@ -1115,30 +558,29 @@ if st.session_state.page == "home":
         </script>
         """, unsafe_allow_html=True)
 
-    # Live stats
-    ev = total_eligible_voters()
-    vt = total_votes_cast()
-    cc = candidate_count()
-    pct = round((vt / ev * 100) if ev > 0 else 0, 1)
+    # Live stats (Now only visible when a poll is active)
+    if active_poll:
+        ap_id = active_poll['poll_id']
+        ev = total_eligible_voters()
+        vt = total_poll_votes(ap_id)
+        cc = len(get_poll_candidates(ap_id))
+        pct = round((vt / ev * 100) if ev > 0 else 0, 1)
 
-    st.markdown(f"""
-    <div class="stat-row">
-        <div class="stat-chip"><span class="num">{ev}</span><span class="lbl">Eligible Voters</span></div>
-        <div class="stat-chip"><span class="num">{vt}</span><span class="lbl">Votes Cast</span></div>
-        <div class="stat-chip"><span class="num">{cc}</span><span class="lbl">Candidates</span></div>
-        <div class="stat-chip"><span class="num">{pct}%</span><span class="lbl">Turnout</span></div>
-    </div>
-    """, unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="stat-row">
+            <div class="stat-chip"><span class="num">{ev}</span><span class="lbl">Eligible Voters</span></div>
+            <div class="stat-chip"><span class="num">{vt}</span><span class="lbl">Votes Cast</span></div>
+            <div class="stat-chip"><span class="num">{cc}</span><span class="lbl">Candidates</span></div>
+            <div class="stat-chip"><span class="num">{pct}%</span><span class="lbl">Turnout</span></div>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    hc1, hc2, hc3 = st.columns(3)
+    hc1, hc2 = st.columns(2)
     with hc1:
-        if st.button("📊 Live Results", key="home_results", use_container_width=True):
-            goto("results")
-    with hc2:
         if st.button("❓ FAQ", key="home_faq", use_container_width=True):
             goto("faq")
-    with hc3:
+    with hc2:
         st.markdown('<p style="text-align:center;color:#334155;font-size:0.75rem;padding-top:0.6rem;">📧 quantumvoting@gmail.com</p>', unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════
@@ -1467,236 +909,241 @@ if st.session_state.page == "query":
     if st.button("← Back", key="query_back"):
         goto("vote")
 
-# PAGE: ADMIN MENU
+# ═══════════════════════════════════════════════════════════
+# PAGE: ADMIN ACCESS (LOGIN/REGISTER)
 # ═══════════════════════════════════════════════════════════
 if st.session_state.page == "admin":
-    st.markdown('<div class="section-title">Admin Console Menu</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-sub">Authorized personnel only. Choose an action.</div>', unsafe_allow_html=True)
-    
-    ac1, ac2 = st.columns(2, gap="medium")
-    with ac1:
-        st.markdown("""
-        <div class="panel-card">
-            <span class="icon">
-                <svg width="68" height="68" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 8px 16px rgba(139,92,246,0.4));">
-                    <defs>
-                        <linearGradient id="accGrad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
-                            <stop stop-color="#8b5cf6"/>
-                            <stop offset="1" stop-color="#6366f1"/>
-                        </linearGradient>
-                    </defs>
-                    <path d="M12 12C14.2091 12 16 10.2091 16 8C16 5.79086 14.2091 4 12 4C9.79086 4 8 5.79086 8 8C8 10.2091 9.79086 12 12 12Z" fill="url(#accGrad)" fill-opacity="0.9" stroke="#c4b5fd" stroke-width="1.2"/>
-                    <path d="M18 20V19C18 16.2386 15.7614 14 13 14H11C8.23858 14 6 16.2386 6 19V20" stroke="#c4b5fd" stroke-width="1.5" stroke-linecap="round"/>
-                    <path d="M15 11L17 13L21 9" stroke="#6ee7b7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-            </span>
-            <h3>Register Admin</h3>
-            <p>Onboard a new authorized administrator.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Proceed to Register", key="menu_admin_reg", use_container_width=True):
-            goto("admin_register")
-            
-    with ac2:
-        st.markdown("""
-        <div class="panel-card">
-            <span class="icon">
-                <svg width="68" height="68" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 8px 16px rgba(244,63,94,0.4));">
-                    <defs>
-                        <linearGradient id="alogGrad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
-                            <stop stop-color="#f43f5e"/>
-                            <stop offset="1" stop-color="#be123c"/>
-                        </linearGradient>
-                    </defs>
-                    <rect x="5" y="11" width="14" height="10" rx="2" fill="url(#alogGrad)" fill-opacity="0.9" stroke="#fda4af" stroke-width="1.5"/>
-                    <path d="M8 11V7C8 4.79086 9.79086 3 12 3C14.2091 3 16 4.79086 16 7V11" stroke="#fda4af" stroke-width="2" stroke-linecap="round"/>
-                    <circle cx="12" cy="16" r="1.5" fill="#ffffff"/>
-                </svg>
-            </span>
-            <h3>Admin Login</h3>
-            <p>Access the core election dashboard.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Proceed to Login", key="menu_admin_login", use_container_width=True):
-            goto("admin_login")
+    if not st.session_state.admin:
+        st.markdown('<div class="section-title">Admin Access</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-sub">Authorized personnel only. Choose an action.</div>', unsafe_allow_html=True)
+        
+        ac1, ac2 = st.columns(2, gap="medium")
+        with ac1:
+            st.markdown(f"""
+            <div class="panel-card">
+                <span class="icon">{ui_assets.ICON_ADMIN_LOGIN}</span>
+                <h3>Admin Login</h3>
+                <p>Manage the election system with root privileges.</p>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button("Proceed to Login", key="adm_login_btn", use_container_width=True):
+                st.session_state.admin_action = "login"
+        
+        with ac2:
+            st.markdown(f"""
+            <div class="panel-card">
+                <span class="icon">{ui_assets.ICON_ADMIN_REG}</span>
+                <h3>Admin Registration</h3>
+                <p>Create a new administrator account (Master Key required).</p>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button("Register New Admin", key="adm_reg_btn", use_container_width=True):
+                st.session_state.admin_action = "register"
 
-if st.session_state.page == "admin_register":
-    st.markdown('<div class="section-title">🆕 Register Admin</div>', unsafe_allow_html=True)
-    st.markdown("---")
-    key  = st.text_input("Admin Secret Key", type="password", placeholder="Issued by system owner", key="admin_key")
-    name = st.text_input("Admin Username", key="admin_name")
-    pwd  = st.text_input("Password", type="password", key="admin_pwd")
-    if st.button("Register as Admin", key="admin_reg"):
-        if not admin_key_valid(key):
-            st.error("❌ Invalid admin key.")
-        elif user_exists(name):
-            st.error("❌ Username already taken.")
-        else:
-            save_user(name, {"password": hash_data(pwd), "role": "admin"})
-            st.success("✅ Admin account created. You can now log in.")
-
-    if st.button("← Back to Menu", key="back_from_areg"):
-        goto("admin")
-
-if st.session_state.page == "admin_login":
-    st.markdown('<div class="section-title">🔐 Admin Login</div>', unsafe_allow_html=True)
-    st.markdown("---")
-    a_name = st.text_input("Admin Username", key="admin_login_name")
-    a_pwd  = st.text_input("Password", type="password", key="admin_login_pwd")
-    if st.button("🔓 Login as Admin", key="admin_login_btn"):
-        doc = get_user(a_name)
-        if doc and doc["password"] == hash_data(a_pwd) and doc.get("role") == "admin":
-            st.session_state.admin = a_name
-            goto("dashboard")
-        else:
-            st.error("❌ Invalid credentials or not an admin account.")
-
-    if st.button("← Back to Menu", key="back_from_alogin"):
-        goto("admin")
+        st.markdown("---")
+        action = st.session_state.get("admin_action")
+        if action == "login":
+            st.markdown("#### 🔐 Admin Login")
+            a_user = st.text_input("Username", key="a_login_u")
+            a_pass = st.text_input("Password", type="password", key="a_login_p")
+            if st.button("Login", key="a_login_submit"):
+                user = get_user(a_user)
+                if user and user.get("role") == "admin" and user.get("password") == hash_data(a_pass):
+                    st.session_state.admin = a_user
+                    goto("dashboard")
+                else:
+                    st.error("❌ Invalid admin credentials.")
+        elif action == "register":
+            st.markdown("#### 🆕 Admin Registration")
+            r_user = st.text_input("Username", key="a_reg_u")
+            r_pass = st.text_input("Password", type="password", key="a_reg_p")
+            r_key  = st.text_input("Master Admin Key", type="password", key="a_reg_k")
+            if st.button("Register Admin", key="a_reg_submit"):
+                if not r_user or not r_pass:
+                    st.warning("Provide username and password.")
+                elif admin_key_valid(r_key):
+                    if user_exists(r_user):
+                        st.error("Admin already exists.")
+                    else:
+                        save_user(r_user, hash_data(r_pass), "admin")
+                        st.success("✅ Admin registered successfully! Proceed to login.")
+                else:
+                    st.error("❌ Invalid Master Administrative Key.")
+    else:
+        goto("dashboard")
 
 # ═══════════════════════════════════════════════════════════
-# PAGE: DASHBOARD
+# PAGE: ADMIN DASHBOARD
 # ═══════════════════════════════════════════════════════════
 if st.session_state.page == "dashboard":
+    if not st.session_state.admin:
+        goto("admin")
+    
+    st.markdown('<div class="section-title">Admin Dashboard</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-sub">Welcome back, <span style="color:#a5b4fc;font-weight:600;">{st.session_state.admin}</span></div>', unsafe_allow_html=True)
+    
+    t1, t2, t3, t4, t5, t6, t7 = st.tabs(["📊 Results", "👥 Candidates", "📜 Voter Roll", "📩 Queries", "👤 Users", "⏳ Pending", "🗳️ Polls"])
 
-    st.markdown(f'<div class="section-title">📊 Election Dashboard</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="section-sub">Logged in as <span style="color:#a5b4fc;font-weight:600">{st.session_state.admin}</span></div>', unsafe_allow_html=True)
-
-    # Live stats row
-    ev  = total_eligible_voters()
-    vt  = total_votes_cast()
-    cc  = candidate_count()
-    pct = round((vt / ev * 100) if ev > 0 else 0, 1)
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("🗳️ Total Votes", vt)
-    c2.metric("👥 Registered", ev)
-    c3.metric("🏛️ Candidates", cc)
-    c4.metric("📈 Turnout", f"{pct}%")
-
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
-    t1, t2, t3, t4, t5, t6, t7 = st.tabs([
-        "📊 Results", "🏛️ Candidates", "📋 Voter Roll", "💬 Queries", "👥 Users", "✅ Pending Users", "🗳️ Polls"
-    ])
-
-    # ── TAB 1: RESULTS ──────────────────────────────────────
+    # ── TAB 1: RESULTS ────────────────────────────────────
     with t1:
-        import datetime as _dt_r
         all_polls_r = get_all_polls()
+        now_r = datetime.now()
 
-        # — Poll-based results (grouped by poll) ————————————
-        if all_polls_r:
-            st.markdown("### 🗳️ Election Poll Results")
-            for _pr in all_polls_r:
-                _prid   = _pr["poll_id"]
-                _prname = _pr["name"]
-                _pr_total = total_poll_votes(_prid)
-                _pr_votes = get_poll_vote_counts(_prid)
-                _pr_cands = get_poll_candidates(_prid)
-                _now_r = _dt_r.datetime.now()
-                _status_r = ("🟢 Active"    if _pr["start_time"] <= _now_r <= _pr["end_time"]
-                             else ("🔜 Upcoming" if _now_r < _pr["start_time"] else "🔴 Ended"))
+        # Initialize session state for poll toggles
+        if "expanded_live_poll_id" not in st.session_state:
+            st.session_state.expanded_live_poll_id = None
+        if "expanded_prev_poll_id" not in st.session_state:
+            st.session_state.expanded_prev_poll_id = None
 
-                st.markdown(f"""
-                <div style='background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.25);
-                     border-radius:14px;padding:1rem 1.2rem;margin:0.8rem 0;'>
-                  <div style='display:flex;justify-content:space-between;align-items:center;'>
-                    <div>
-                      <span style='font-size:1rem;font-weight:700;color:#a5b4fc;'>{_prname}</span>
-                      &nbsp;<span style='font-size:0.75rem;color:#64748b;'>{_status_r}</span>
-                    </div>
-                    <span style='font-size:0.82rem;color:#64748b;'>{_pr_total} votes</span>
-                  </div>
-                </div>""", unsafe_allow_html=True)
+        if not all_polls_r:
+            st.info("No election polls found in the system.")
+        else:
+            # Categorize Polls
+            live_polls = [p for p in all_polls_r if p["start_time"] <= now_r <= p["end_time"]]
+            previous_polls = [p for p in all_polls_r if now_r > p["end_time"]]
 
-                if not _pr_cands:
-                    st.caption("No candidates in this poll.")
-                elif _pr_total == 0:
-                    st.caption("No votes cast yet in this poll.")
-                    for _prc in _pr_cands:
+            # — SECTION 1: LIVE POLLING ———————————————————
+            st.markdown("### 🔴 Live Polling")
+            if not live_polls:
+                st.caption("No polls are currently active.")
+            else:
+                # Button Grid for Live Polls
+                l_cols = st.columns(3)
+                for i, lp in enumerate(live_polls):
+                    if l_cols[i % 3].button(f"🗳️ {lp['name']}", key=f"btn_live_{lp['poll_id']}", use_container_width=True):
+                        st.session_state.expanded_live_poll_id = lp['poll_id'] if st.session_state.expanded_live_poll_id != lp['poll_id'] else None
+
+                # Details for selected Live Poll
+                exp_l_id = st.session_state.expanded_live_poll_id
+                if exp_l_id:
+                    lp = next((p for p in live_polls if p['poll_id'] == exp_l_id), None)
+                    if lp:
+                        lpid = lp["poll_id"]
+                        lp_votes = get_poll_vote_counts(lpid)
+                        lp_total = sum(lp_votes.values()) if lp_votes else 0
+                        lp_cands = get_poll_candidates(lpid)
+                        lp_eligible = total_eligible_voters()
+
                         st.markdown(f"""
-                        <div class='result-row'>
-                          <span style='font-weight:600;color:#e2e8f0;'>{_prc['name']}</span>
-                          <span style='color:#64748b;'>0 votes</span>
-                        </div>""", unsafe_allow_html=True)
-                else:
-                    _pr_max = max(_pr_votes.values()) if _pr_votes else 0
-                    for _prc in sorted(_pr_cands, key=lambda x: _pr_votes.get(x["name"],0), reverse=True):
-                        _prc_cnt = _pr_votes.get(_prc["name"], 0)
-                        _prc_pct = round(_prc_cnt / _pr_total * 100, 1) if _pr_total else 0
-                        _is_lead = _prc_cnt == _pr_max and _pr_max > 0
-                        _pill_l  = '<span class="pill pill-green">Leading</span>' if _is_lead else ''
-                        _img_b   = _prc.get("symbol_image_b64","")
-                        _thumb   = (f"<img src='data:image/png;base64,{_img_b}' width='32' height='32' "
-                                    f"style='border-radius:6px;margin-right:10px;vertical-align:middle;'>" if _img_b
-                                    else f"<span style='font-size:1.4rem;margin-right:10px;'>{_prc.get('symbol','🗳️')}</span>")
-                        st.markdown(f"""
-                        <div class='result-row' style='margin:4px 0;'>
-                          <div style='display:flex;align-items:center;'>
-                            {_thumb}
-                            <span style='font-weight:600;color:#e2e8f0;'>{_prc["name"]}</span>
-                            &nbsp;{_pill_l}
-                          </div>
-                          <div style='font-family:\'Space Grotesk\',sans-serif;font-size:1.1rem;
-                               font-weight:700;color:#a5b4fc;'>{_prc_cnt}</div>
-                        </div>
-                        <div class='result-bar-wrap'>
-                          <div class='result-bar' style='width:{_prc_pct}%;'></div>
-                        </div>""", unsafe_allow_html=True)
-                    # Poll pie chart
-                    if go and _pr_total > 0:
-                        _pc_labels = [c["name"] for c in _pr_cands]
-                        _pc_values = [_pr_votes.get(c["name"],0) for c in _pr_cands]
-                        _clrs_r    = ["#6366f1","#06b6d4","#10b981","#f59e0b","#f43f5e"]
-                        _fig_r = go.Figure(go.Pie(
-                            labels=_pc_labels, values=_pc_values, hole=0.45,
-                            marker=dict(colors=_clrs_r[:len(_pc_labels)],
-                                        line=dict(color='#0f172a',width=3)),
-                            textinfo="label+percent",
-                            textfont=dict(color="#e2e8f0",size=13),
-                        ))
-                        _fig_r.update_layout(
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            font=dict(color="#e2e8f0",family="Inter"),
-                            margin=dict(t=20,b=20,l=20,r=20), showlegend=True,
-                            legend=dict(font=dict(color="#94a3b8",size=11),bgcolor="rgba(0,0,0,0)"),
-                            annotations=[dict(text=f"<b>{_pr_total}</b><br>votes",
-                                             font=dict(size=14,color="#a5b4fc"),showarrow=False)]
-                        )
-                        st.plotly_chart(_fig_r, use_container_width=True, key=f"pie_{_prid}")
-            st.markdown("---")
+                        <div style='background:rgba(99,102,241,0.05); border:1px solid rgba(99,102,241,0.2); border-radius:16px; padding:1.5rem; margin-top:1rem;'>
+                            <div style='font-size:1.3rem; font-weight:800; color:#a5b4fc; margin-bottom:0.5rem;'>{lp['name']}</div>
+                            <div style='color:#94a3b8; font-size:0.95rem; margin-bottom:1.2rem;'>{lp.get('description', 'No description available.')}</div>
+                            <div class='divider' style='margin:1rem 0;'></div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Candidates List
+                        st.markdown("#### Candidates")
+                        if lp_cands:
+                            for c in lp_cands:
+                                c_name = c["name"]
+                                c_votes = lp_votes.get(c_name, 0)
+                                c_img = c.get("symbol_image_b64", "")
+                                c_sym = c.get("symbol", "🗳️")
+                                
+                                symbol_html = (f"<img src='data:image/png;base64,{c_img}' width='36' height='36' style='border-radius:6px;'>" 
+                                              if c_img else f"<span style='font-size:1.8rem;'>{c_sym}</span>")
+                                
+                                st.markdown(f"""
+                                <div style='display:flex; align-items:center; background:rgba(255,255,255,0.03); padding:12px 20px; border-radius:12px; margin-bottom:8px; border:1px solid rgba(255,255,255,0.05);'>
+                                    <div style='flex: 1; font-weight:700; color:#e2e8f0; font-size:1.1rem;'>{c_name}</div>
+                                    <div style='margin: 0 40px; display: flex; align-items: center;'>{symbol_html}</div>
+                                    <div style='font-weight:800; color:#a5b4fc; font-size:1.2rem; min-width:100px; text-align:right;'>{c_votes} <span style='font-size:0.8rem; color:#64748b; font-weight:400;'>votes</span></div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                        
+                        # Metrics and Lead
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        mc1, mc2 = st.columns(2)
+                        with mc1:
+                            st.metric("👥 Total Eligible Voters", lp_eligible)
+                            st.metric("📥 Voters Participated", lp_total)
+                        with mc2:
+                            # Plotly analytics
+                            ui_assets.render_poll_analytics(lp_votes)
 
-        # — Legacy global results ———————————————————
-        votes  = get_vote_counts()
-        cands  = get_candidate_names()
-        if cands and vt > 0:
-            with st.expander("📊 Legacy Global Votes", expanded=not all_polls_r):
-                result = {c: votes.get(c, 0) for c in cands}
-                max_v  = max(result.values()) if result else 0
-                for cand, count in sorted(result.items(), key=lambda x: x[1], reverse=True):
-                    pct_bar = (count / vt * 100) if vt > 0 else 0
-                    is_lead = count == max_v and max_v > 0
-                    pill = '<span class="pill pill-green">Leading</span>' if is_lead else ''
-                    st.markdown(f"""
-                    <div class="result-row">
-                        <div><span style="font-weight:700;color:#e2e8f0">{cand}</span>&nbsp;{pill}</div>
-                        <div style="font-family:'Space Grotesk',sans-serif;font-size:1.1rem;
-                             font-weight:700;color:#a5b4fc">{count}</div>
-                    </div>
-                    <div class="result-bar-wrap">
-                        <div class="result-bar" style="width:{pct_bar:.1f}%"></div>
-                    </div>""", unsafe_allow_html=True)
-                winners = [k for k,v in result.items() if v==max_v and max_v>0]
-                if len(winners)==1:
-                    st.success(f"🏆 **{winners[0]}** leads with {max_v} votes")
-                elif len(winners)>1:
-                    st.warning(f"🤝 Tie: {', '.join(winners)}")
-        elif not all_polls_r:
-            st.info("No votes or candidates yet.")
+                        if lp_votes and len(lp_votes) > 1:
+                            sorted_v = sorted(lp_votes.items(), key=lambda x: x[1], reverse=True)
+                            leader_name, leader_v = sorted_v[0]
+                            runner_up_name, runner_up_v = sorted_v[1]
+                            diff = leader_v - runner_up_v
+                            if diff > 0:
+                                st.success(f"🚀 **{leader_name}** is leading by **{diff}** votes over {runner_up_name}")
+                            else:
+                                st.warning(f"⚖️ **{leader_name}** and **{runner_up_name}** are currently tied!")
+                        elif lp_votes and len(lp_votes) == 1:
+                            st.info(f"🏆 **{list(lp_votes.keys())[0]}** is leading")
+                        
+                        st.markdown("</div>", unsafe_allow_html=True)
+
+            st.markdown("<br><br>", unsafe_allow_html=True)
+            
+            # — SECTION 2: PREVIOUS POLLING ———————————————————
+            st.markdown("### 📂 Previous Polling")
+            if not previous_polls:
+                st.caption("No previous polls found.")
+            else:
+                # Button Grid for Previous Polls
+                p_cols = st.columns(3)
+                for i, pp in enumerate(previous_polls):
+                    if p_cols[i % 3].button(f"📜 {pp['name']}", key=f"btn_prev_{pp['poll_id']}", use_container_width=True):
+                        st.session_state.expanded_prev_poll_id = pp['poll_id'] if st.session_state.expanded_prev_poll_id != pp['poll_id'] else None
+
+                # Details for selected Previous Poll
+                exp_p_id = st.session_state.expanded_prev_poll_id
+                if exp_p_id:
+                    pp = next((p for p in previous_polls if p['poll_id'] == exp_p_id), None)
+                    if pp:
+                        ppid = pp["poll_id"]
+                        pp_votes = get_poll_vote_counts(ppid)
+                        pp_total = sum(pp_votes.values()) if pp_votes else 0
+                        pp_cands = get_poll_candidates(ppid)
+                        pp_eligible = total_eligible_voters()
+
+                        st.markdown(f"""
+                        <div style='background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:1.5rem; margin-top:1rem;'>
+                            <div style='font-size:1.3rem; font-weight:800; color:#e2e8f0; margin-bottom:0.5rem;'>{pp['name']}</div>
+                            <div style='color:#64748b; font-size:0.9rem; margin-bottom:1.2rem;'>{pp.get('description', 'No description available.')}</div>
+                            <div class='divider' style='margin:1rem 0;'></div>
+                        """, unsafe_allow_html=True)
+
+                        # Standings
+                        st.markdown("#### Final Standings")
+                        if pp_cands:
+                            for c in sorted(pp_cands, key=lambda x: pp_votes.get(x["name"],0), reverse=True):
+                                c_name = c["name"]
+                                c_votes = pp_votes.get(c_name, 0)
+                                c_img = c.get("symbol_image_b64", "")
+                                c_sym = c.get("symbol", "🗳️")
+                                
+                                symbol_html = (f"<img src='data:image/png;base64,{c_img}' width='32' height='32' style='border-radius:6px;'>" 
+                                              if c_img else f"<span style='font-size:1.5rem;'>{c_sym}</span>")
+                                
+                                st.markdown(f"""
+                                <div style='display:flex; align-items:center; background:rgba(255,255,255,0.02); padding:10px 18px; border-radius:10px; margin-bottom:6px; border:1px solid rgba(255,255,255,0.05);'>
+                                    <div style='flex: 1; font-weight:600; color:#cbd5e1;'>{c_name}</div>
+                                    <div style='margin: 0 40px; display: flex; align-items: center;'>{symbol_html}</div>
+                                    <div style='font-weight:700; color:#818cf8; min-width:80px; text-align:right;'>{c_votes} votes</div>
+                                </div>
+                                """, unsafe_allow_html=True)
+
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        pmc1, pmc2 = st.columns(2)
+                        with pmc1:
+                            st.metric("👥 Total Eligible Voters", pp_eligible)
+                            st.metric("📥 Voters Participated", pp_total)
+                        with pmc2:
+                            # Plotly analytics
+                            ui_assets.render_poll_analytics(pp_votes)
+
+                        if pp_votes:
+                            winner = max(pp_votes, key=pp_votes.get)
+                            st.success(f"🎊 **Final Verdict:** **{winner}** has won the election!")
+                        
+                        st.markdown("</div>", unsafe_allow_html=True)
+
     # ── TAB 2: CANDIDATE MANAGER ────────────────────────────
     with t2:
-        # — Poll candidates grouped by poll ——————————————
+        # — Poll candidates grouped by poll —─────────────
         all_polls_c = get_all_polls()
         if all_polls_c:
             st.markdown("### 🗳️ Poll Candidates (grouped by election)")
@@ -1952,7 +1399,6 @@ if st.session_state.page == "dashboard":
 
     # ── TAB 7: POLLS ──────────────────────────────────────
     with t7:
-        import datetime as dt_mod2
         st.markdown("### 🗳️ Create New Election Poll")
         with st.form("create_poll_form"):
             poll_name_f   = st.text_input("Election Name", placeholder="e.g. 2025 General Election")
@@ -1972,8 +1418,8 @@ if st.session_state.page == "dashboard":
             if not poll_name_f.strip():
                 st.error("Poll name is required.")
             else:
-                p_start = dt_mod2.datetime.combine(p_start_date, p_start_ti)
-                p_end   = dt_mod2.datetime.combine(p_end_date, p_end_ti)
+                p_start = datetime.combine(p_start_date, p_start_ti)
+                p_end   = datetime.combine(p_end_date, p_end_ti)
                 if p_end <= p_start:
                     st.error("End time must be after start time.")
                 else:
@@ -1993,7 +1439,7 @@ if st.session_state.page == "dashboard":
         else:
             for p in all_polls_list:
                 sel_pid = p["poll_id"]
-                now_u = dt_mod2.datetime.now()
+                now_u = datetime.now()
                 status_lbl = ("🟢 Active"    if p["start_time"] <= now_u <= p["end_time"]
                               else ("🔜 Upcoming" if now_u < p["start_time"] else "🔴 Ended"))
                 
@@ -2044,7 +1490,7 @@ if st.session_state.page == "dashboard":
                         if st.button("🎨 Generate Image", key=f"gen_sym_{sel_pid}"):
                             if nc_sym.strip():
                                 with st.spinner(f"AI generating image for '{nc_sym}' (~10s)..."):
-                                    gimg = generate_symbol_image(nc_sym.strip())
+                                    gimg = ui_assets.generate_symbol_image(nc_sym.strip())
                                 if gimg:
                                     st.session_state[f"prev_img_{sel_pid}"] = gimg
                                     st.session_state[f"prev_sym_{sel_pid}"] = nc_sym.strip()
@@ -2178,7 +1624,6 @@ if st.session_state.page == "voter_dashboard":
         </div>
         """, unsafe_allow_html=True)
         
-        # (Direct link box removed as per request)
         st.markdown('<div style="margin-top:1rem;"></div>', unsafe_allow_html=True)
 
         tab_active, tab_past = st.tabs(["🟢 Active & Upcoming", "📜 Election History"])
@@ -2269,8 +1714,6 @@ if st.session_state.page == "voter_dashboard":
                 goto("user")
 
 
-
-
 # ═══════════════════════════════════════════════════════════
 # PAGE: FAQ
 # ═══════════════════════════════════════════════════════════
@@ -2294,8 +1737,6 @@ if st.session_state.page == "faq":
         with st.expander(f"🔹 {q}"):
             st.markdown(f'<p style="color:#94a3b8;line-height:1.8;">{a}</p>', unsafe_allow_html=True)
     st.markdown("---")
-    if st.button("← Back to Voter Dashboard", key="faq_back"):
-        goto("voter_dashboard")
 
 # ═══════════════════════════════════════════════════════════
 # PAGE: LIVE RESULTS
@@ -2341,23 +1782,68 @@ if st.session_state.page == "results":
                 st.progress(pct/100)
                 
         with tab_charts:
-            if go and total > 0:
-                cands_list = list(vote_counts.keys())
-                counts_list = list(vote_counts.values())
-                cols_palette = ["#6366f1","#06b6d4","#10b981","#f59e0b","#f43f5e"]
-                fig = go.Figure(go.Pie(
-                    labels=cands_list, values=counts_list, hole=0.45,
-                    marker=dict(colors=cols_palette[:len(cands_list)], line=dict(color='#0f172a', width=3)),
-                    textinfo="label+percent", textfont=dict(color="#e2e8f0", size=14),
-                ))
-                fig.update_layout(
-                    paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#e2e8f0", family="Inter"),
-                    margin=dict(t=30,b=30,l=20,r=20), showlegend=True,
-                    legend=dict(font=dict(color="#94a3b8", size=13), bgcolor="rgba(0,0,0,0)"),
-                    annotations=[dict(text=f"<b>{total}</b><br><span style='font-size:10px'>Total Votes</span>",
-                                      font=dict(size=18, color="#a5b4fc"), showarrow=False)]
-                )
-                st.plotly_chart(fig, use_container_width=True)
+            eligible = total_eligible_voters()
+            participated = total
+            turnout_pct = (participated / eligible * 100) if eligible > 0 else 0
+            
+            st.markdown("### 📈 Turnout Analysis")
+            col_m1, col_m2, col_m3 = st.columns(3)
+            with col_m1:
+                st.metric("Total Eligible", eligible)
+            with col_m2:
+                st.metric("Votes Cast", participated)
+            with col_m3:
+                st.metric("Turnout %", f"{round(turnout_pct, 1)}%", delta=f"{participated} Voted", delta_color="normal")
+            
+            st.markdown('<div style="margin-top:2rem;"></div>', unsafe_allow_html=True)
+            
+            if total > 0:
+                inner_col1, inner_col2 = st.columns([1, 1])
+                
+                with inner_col1:
+                    st.markdown("#### 🗳️ Vote Distribution")
+                    if go:
+                        cands_list = list(vote_counts.keys())
+                        counts_list = list(vote_counts.values())
+                        cols_palette = ["#6366f1","#06b6d4","#10b981","#f59e0b","#f43f5e"]
+                        fig = go.Figure(go.Pie(
+                            labels=cands_list, values=counts_list, hole=0.45,
+                            marker=dict(colors=cols_palette[:len(cands_list)], line=dict(color='#0f172a', width=3)),
+                            textinfo="label+percent", textfont=dict(color="#e2e8f0", size=14),
+                        ))
+                        fig.update_layout(
+                            paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#e2e8f0", family="Inter"),
+                            margin=dict(t=10,b=10,l=10,r=10), showlegend=True,
+                            legend=dict(font=dict(color="#94a3b8", size=12), bgcolor="rgba(0,0,0,0)", orientation="h", y=-0.1),
+                            annotations=[dict(text=f"<b>{total}</b><br><span style='font-size:10px'>Votes</span>",
+                                              font=dict(size=18, color="#a5b4fc"), showarrow=False)]
+                        )
+                        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                    else:
+                        st.warning("Plotly visualization unavailable. Please check installation.")
+                
+                with inner_col2:
+                    st.markdown("#### 📊 Participation Rate")
+                    non_voters = eligible - participated
+                    if go:
+                        fig_turnout = go.Figure(go.Pie(
+                            labels=["Voted", "Not Voted"],
+                            values=[participated, max(0, non_voters)],
+                            marker=dict(colors=["#6366f1", "rgba(148, 163, 184, 0.1)"], line=dict(color='#0f172a', width=2)),
+                            textinfo="none", hole=0.7
+                        ))
+                        fig_turnout.update_layout(
+                            paper_bgcolor="rgba(0,0,0,0)", showlegend=False,
+                            margin=dict(t=10,b=10,l=10,r=10),
+                            annotations=[dict(text=f"<b>{round(turnout_pct, 1)}%</b>",
+                                              font=dict(size=24, color="#6366f1", family="Inter"), showarrow=False)]
+                        )
+                        st.plotly_chart(fig_turnout, use_container_width=True, config={'displayModeBar': False})
+                    else:
+                        st.progress(turnout_pct / 100)
+                        st.markdown(f'<div style="text-align:center;color:#94a3b8;">{round(turnout_pct, 1)}% Participation</div>', unsafe_allow_html=True)
+            else:
+                st.info("No votes have been cast yet. Analytics will appear once election starts.")
                 
         with tab_export:
             st.markdown("### 📄 Download Election Results Report")
@@ -2365,7 +1851,7 @@ if st.session_state.page == "results":
                 st.info("No votes cast yet.")
             else:
                 winner_pdf = max(vote_counts, key=vote_counts.get)
-                gen_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+                gen_time = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
 
                 import csv, io
                 csv_buf = io.StringIO()
@@ -2407,7 +1893,7 @@ if st.session_state.page == "results":
 
     else:
         st.markdown('<div class="section-title">📜 Completed Polls</div>', unsafe_allow_html=True)
-        st.markdown('<div class="section-sub">Select an election to view detailed module analytics.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-sub">Select an election to view detailed occupancy analytics.</div>', unsafe_allow_html=True)
         st.markdown("---")
         
         past_polls = get_past_polls()
@@ -2434,7 +1920,3 @@ if st.session_state.page == "results":
 
         st.markdown("---")
         if st.button("← Back to Voter Dashboard", key="results_back"): goto("voter_dashboard")
-
-
-
-
