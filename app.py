@@ -658,23 +658,29 @@ if st.session_state.page == "user_register":
             st.error("❌ Face capture is required.")
         elif is_duplicate_face_db(img):
             st.error("❌ This face is already registered with another account.")
+        elif not voter_doc:
+            st.error("❌ Voter ID not found in the authorized database. Please contact the administrator.")
+        elif "face_b64" not in voter_doc or not voter_doc["face_b64"]:
+            st.error("❌ No reference photo found for this Voter ID. The administrator must upload a reference photo for you before you can register.")
         else:
             face_b64 = get_face_b64(img.getvalue())
             if not face_b64:
                 st.error("❌ No face detected. Ensure good lighting and look directly at the camera.")
             else:
-                save_pending_user(uname, {
-                    "vote_id": vid, 
-                    "email": email, 
-                    "password": hash_data(pwd), 
-                    "role": "user", 
-                    "face_b64": face_b64,
-                    "status": "pending"
-                })
-                if not voter_doc:
-                    st.info("⚠️ I think you are a new voter, your details are not currently in the database. Our admin will verify your Voter ID when he accepts it. We will send an email regarding your verification, then you can log in.")
+                new_face_arr = extract_face(img.getvalue())
+                saved_face = decode_face_b64(voter_doc["face_b64"])
+                if saved_face is not None and new_face_arr is not None and compare_faces(new_face_arr, saved_face):
+                    save_pending_user(uname, {
+                        "vote_id": vid, 
+                        "email": email, 
+                        "password": hash_data(pwd), 
+                        "role": "user", 
+                        "face_b64": face_b64,
+                        "status": "pending"
+                    })
+                    st.success("✅ **Details sent to Admin!** Biometric match successful. Your registration is in progress. The administrator will verify your info and send you an email. You can login only after verification.")
                 else:
-                    st.success("✅ **Details sent to Admin!** Your registration is in progress. The administrator will verify your info and send you an email. You can login only after verification.")
+                    st.error("❌ Identity mismatch: Your live face capture does not match the authorized reference photo for this Voter ID.")
 
     if st.button("← Back to Menu", key="back_from_reg"):
         goto("user")
@@ -1218,14 +1224,29 @@ if st.session_state.page == "dashboard":
             new_vid  = st.text_input("Voter ID", key="new_vid", placeholder="e.g. VOTE2025001")
         with v2:
             new_vname = st.text_input("Voter Name", key="new_vname", placeholder="Official name")
+        
+        st.markdown("**Voter Reference Photo (Required)**")
+        photo_tab1, photo_tab2 = st.tabs(["📁 Upload Image", "📷 Capture from Camera"])
+        with photo_tab1:
+            new_vface_upload = st.file_uploader("Select Image File", type=["jpg", "png", "jpeg"], key="new_vface_up", label_visibility="collapsed")
+        with photo_tab2:
+            new_vface_cam = st.camera_input("Take Photo", key="new_vface_cam", label_visibility="collapsed")
+            
+        new_vface = new_vface_upload or new_vface_cam
 
         if st.button("➕ Add to Voter Roll", key="add_voter"):
             if not new_vid.strip() or not new_vname.strip():
                 st.error("Both Voter ID and Name are required.")
+            elif not new_vface:
+                st.error("Voter reference photo is required.")
             else:
-                add_valid_voter(new_vid.strip().upper(), new_vname.strip())
-                st.success(f"✅ Voter **{new_vid.upper()}** added to the roll.")
-                st.rerun()
+                face_b64 = get_face_b64(new_vface.getvalue())
+                if not face_b64:
+                    st.error("❌ No face detected in the uploaded image. Please ensure a clear view of the face.")
+                else:
+                    add_valid_voter(new_vid.strip().upper(), new_vname.strip(), face_b64)
+                    st.success(f"✅ Voter **{new_vid.upper()}** added to the roll with reference photo.")
+                    st.rerun()
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
         st.markdown("**Voter Roll**")
@@ -1236,7 +1257,7 @@ if st.session_state.page == "dashboard":
             for v in voters:
                 r1, r2 = st.columns([5, 1])
                 with r1:
-                    status = "Voted" if v.get("voted") else "Pending"
+                    status = "Voted" if v.get("voted") else "Not Voted"
                     pill_cls = "pill-green" if v.get("voted") else "pill-amber"
                     st.markdown(f"""
                     <div class="result-row" style="margin:4px 0">

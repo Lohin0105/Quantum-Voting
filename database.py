@@ -109,13 +109,16 @@ def total_votes_cast():
 def get_valid_voter(vote_id):
     doc = valid_voters_col.find_one({"vote_id": vote_id})
     if doc:
-        return {"name": doc["name"], "voted": doc["voted"]}
+        return {"name": doc["name"], "voted": doc["voted"], "face_b64": doc.get("face_b64")}
     return None
 
-def add_valid_voter(vote_id, name):
+def add_valid_voter(vote_id, name, face_b64=None):
+    data = {"vote_id": vote_id, "name": name, "voted": False}
+    if face_b64:
+        data["face_b64"] = face_b64
     valid_voters_col.update_one(
         {"vote_id": vote_id},
-        {"$setOnInsert": {"vote_id": vote_id, "name": name, "voted": False}},
+        {"$set": data},
         upsert=True
     )
 
