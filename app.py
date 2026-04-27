@@ -379,6 +379,15 @@ def is_duplicate_face_db(img):
                 return True
     return False
 
+def check_duplicate_voter_face(new_face_arr):
+    for v in get_all_valid_voters():
+        b64_str = v.get("face_b64")
+        if b64_str:
+            saved_face = decode_face_b64(b64_str)
+            if saved_face is not None and compare_faces(new_face_arr, saved_face):
+                return v.get("vote_id")
+    return None
+
 def verify_face_db(username, img):
     user_doc = get_user(username)
     if not user_doc or "face_b64" not in user_doc:
@@ -1244,9 +1253,14 @@ if st.session_state.page == "dashboard":
                 if not face_b64:
                     st.error("❌ No face detected in the uploaded image. Please ensure a clear view of the face.")
                 else:
-                    add_valid_voter(new_vid.strip().upper(), new_vname.strip(), face_b64)
-                    st.success(f"✅ Voter **{new_vid.upper()}** added to the roll with reference photo.")
-                    st.rerun()
+                    new_face_arr = extract_face(new_vface.getvalue())
+                    dup_vid = check_duplicate_voter_face(new_face_arr)
+                    if dup_vid and dup_vid != new_vid.strip().upper():
+                        st.error(f"❌ This face is already allocated to voting ID: {dup_vid}")
+                    else:
+                        add_valid_voter(new_vid.strip().upper(), new_vname.strip(), face_b64)
+                        st.success(f"✅ Voter **{new_vid.upper()}** added to the roll with reference photo.")
+                        st.rerun()
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
         st.markdown("**Voter Roll**")
