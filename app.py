@@ -1259,19 +1259,24 @@ if st.session_state.page == "dashboard":
                 with r1:
                     status = "Voted" if v.get("voted") else "Not Voted"
                     pill_cls = "pill-green" if v.get("voted") else "pill-amber"
+                    
+                    v_id = v.get('vote_id', 'Unknown ID')
+                    v_name = v.get('name', 'Unknown Name')
+                    
                     st.markdown(f"""
                     <div class="result-row" style="margin:4px 0">
                         <div>
-                            <span style="font-weight:600;color:#e2e8f0">{v['vote_id']}</span>
-                            &nbsp;<span style="color:#94a3b8;font-size:0.85rem">{v['name']}</span>
+                            <span style="font-weight:600;color:#e2e8f0">{v_id}</span>
+                            &nbsp;<span style="color:#94a3b8;font-size:0.85rem">{v_name}</span>
                         </div>
                         <span class="pill {pill_cls}">{status}</span>
                     </div>
                     """, unsafe_allow_html=True)
                 with r2:
-                    if st.button("🗑️", key=f"del_voter_{v['vote_id']}"):
-                        remove_valid_voter(v["vote_id"])
-                        st.rerun()
+                    if st.button("🗑️", key=f"del_voter_{v_id}"):
+                        if v_id != 'Unknown ID':
+                            remove_valid_voter(v_id)
+                            st.rerun()
 
     # ── TAB 4: QUERIES ────────────────────────────────────
     with t4:
